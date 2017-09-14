@@ -67,8 +67,7 @@ details.
 These properties can be specified globally via System Properties or on a per tenant basis:
 
 ```
-curl -v \
-     -X POST \
+curl -X POST \
      -u admin:password \
      -H 'X-Killbill-ApiKey: bob' \
      -H 'X-Killbill-ApiSecret: lazar' \
@@ -116,13 +115,99 @@ A tax rate object looks like this:
   "product_name"    : "PostedDatumMetrics",
   "tax_code"        : "GST",
   "tax_rate"        : "0.15",
-  "valid_from_date" : "2010-10-01T00:00:00.000Z",
-  "valid_to_date"   : null
+  "valid_from_date" : "2000-10-01T00:00:00.000Z",
+  "valid_to_date"   : "2010-10-01T00:00:00.000Z"
 }
 ```
 
-The `*_date` properties are expressed as ISO8601 dates. Only the `valid_to_date`
-property may be `null`.
+The `*_date` properties are expressed as ISO8601 dates. Only the `valid_to_date` property may be
+`null`. The plugin accepts any valid ISO8601 date on requests, including any time zone offset; when
+responding the dates will always be formatted in the UTC time zone as shown above.
+
+### Example GET request
+
+To query for tax rates that apply to the _PostedDatumMetrics_ product on 1 Oct 2010
+in the _Pacific/Auckland_ time zone, you could make a request like:
+
+```
+curl -X GET \
+     -u admin:password \
+     -H 'X-Killbill-ApiKey: bob' \
+     -H 'X-Killbill-ApiSecret: lazar' \
+     -H 'X-Killbill-CreatedBy: admin' \
+	'http://127.0.0.1:8080/plugins/killbill-easytax/taxCodes/NZ/PostedDatumMetrics?validDate=2010-10-01T00:00%2B13:00'
+```
+
+which would return results like:
+
+```json
+[
+  {
+    "created_date": "2017-09-14T05:33:27.000Z",
+    "tenant_id": "3e266fd5-50e8-4123-88ed-f9f0f2e6fa16",
+    "tax_zone": "NZ",
+    "product_name": "PostedDatumMetrics",
+    "tax_code": "GST",
+    "tax_rate": "0.150000000",
+    "valid_from_date": "2010-09-30T11:00:00.000Z"
+  }
+]
+```
+
+Note how the `validDate` query parameter was expressed in _Pacific/Auckland_ time, while the
+response is in UTC. Also note the response does not include a `valid_to_date`, which indicates that
+tax rate is in effect for any date on or after the `valid_from_date`.
+
+You could also use the `?validNow=true` request parameter as a shortcut for finding the effective
+tax rates for the current time.
+
+### Example POST request
+
+To upload tax rates in bulk, a request like the following could be used to represent a single tax
+code `GST` on a `PostedDatumMetrics` product whose rate changed on 1 Oct 2010 from 12.5% to 15% and
+has not changed since then:
+
+
+```
+curl -X POST \
+     -u admin:password \
+     -H 'X-Killbill-ApiKey: bob' \
+     -H 'X-Killbill-ApiSecret: lazar' \
+     -H 'X-Killbill-CreatedBy: admin' \
+     -H 'Content-Type: application/json; charset=utf-8' \
+     -d $'[
+  {
+    "tax_zone": "NZ",
+    "product_name": "PostedDatumMetrics",
+    "tax_code": "GST",
+    "tax_rate": "0.125",
+    "valid_from_date": "1999-01-01T00:00:00+13:00",
+    "valid_to_date": "2010-10-01T00:00:00+13:00"
+  },
+  {
+    "tax_zone": "NZ",
+    "product_name": "PostedDatumMetrics",
+    "tax_code": "GST",
+    "tax_rate": "0.15",
+    "valid_from_date": "2010-10-01T00:00:00+13:00"
+  }
+]' \
+	'http://127.0.0.1:8080/plugins/killbill-easytax/taxCodes'
+```
+
+### Example DELETE request
+
+To delete all tax rates that apply to the _PostedDatumMetrics_ product in the _NZ_ tax zone, you
+could make a request like:
+
+```
+curl -X DELETE \
+     -u admin:password \
+     -H 'X-Killbill-ApiKey: bob' \
+     -H 'X-Killbill-ApiSecret: lazar' \
+     -H 'X-Killbill-CreatedBy: admin' \
+	'http://127.0.0.1:8080/plugins/killbill-easytax/taxCodes/NZ/PostedDatumMetrics'
+```
 
 
 EasyTax tax calculation details
