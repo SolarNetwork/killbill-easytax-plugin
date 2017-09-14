@@ -110,13 +110,13 @@ A tax rate object looks like this:
 
 ```json
 {
-  "created_date"    : "2010-10-01T00:00:00+13:00",
+  "created_date"    : "2010-10-01T00:00:00.000Z",
   "tenant_id"       : "3e266fd5-50e8-4123-88ed-f9f0f2e6fa16",
   "tax_zone"        : "NZ",
   "product_name"    : "PostedDatumMetrics",
   "tax_code"        : "GST",
   "tax_rate"        : "0.15",
-  "valid_from_date" : "2010-10-01T00:00:00+13:00",
+  "valid_from_date" : "2010-10-01T00:00:00.000Z",
   "valid_to_date"   : null
 }
 ```
