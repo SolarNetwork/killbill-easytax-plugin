@@ -1,0 +1,17 @@
+[
+{
+"tax_zone" : "NZ",
+"product_name" : "memory-use",
+"tax_code" : "GST",
+"tax_rate" : "0.15",
+"valid_from_date" : "2017-01-01T12:00:00Z",
+"valid_to_date" : "2017-09-01T01:02:03Z"
+},
+{
+"tax_zone" : "NZ",
+"product_name" : "memory-use",
+"tax_code" : "GST",
+"tax_rate" : "0.15",
+"valid_from_date" : "2017-09-01T01:02:03Z"
+}
+]
