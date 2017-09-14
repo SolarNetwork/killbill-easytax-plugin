@@ -286,7 +286,7 @@ public class EasyTaxServlet extends PluginServlet {
         if (matcher.matches()) {
             String taxZone = matcher.group(2);
             String productName = matcher.group(4);
-            String taxCode = matcher.group(4);
+            String taxCode = matcher.group(6);
             deleteTaxCodes(tenant, taxZone, productName, taxCode, resp);
         } else {
             buildNotFoundResponse("Resource " + pathInfo + " not found", resp);

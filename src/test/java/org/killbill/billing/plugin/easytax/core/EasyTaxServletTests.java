@@ -354,6 +354,7 @@ public class EasyTaxServletTests {
         servlet.service(req, res);
 
         // then
+        then(dao).should().removeTaxCodes(tenantId, null, null, null);
         thenDefaultOkResponse();
 
         assertEquals(byos.toString("UTF-8"), "", "Response body content");
@@ -370,6 +371,7 @@ public class EasyTaxServletTests {
         servlet.service(req, res);
 
         // then
+        then(dao).should().removeTaxCodes(tenantId, "NZ", null, null);
         thenDefaultOkResponse();
 
         assertEquals(byos.toString("UTF-8"), "");
@@ -387,6 +389,7 @@ public class EasyTaxServletTests {
         servlet.service(req, res);
 
         // then
+        then(dao).should().removeTaxCodes(tenantId, "NZ", "memory-use", null);
         thenDefaultOkResponse();
 
         assertEquals(byos.toString("UTF-8"), "");
@@ -405,6 +408,7 @@ public class EasyTaxServletTests {
         servlet.service(req, res);
 
         // then
+        then(dao).should().removeTaxCodes(tenantId, "NZ", "memory-use", "GST");
         thenDefaultOkResponse();
 
         assertEquals(byos.size(), 0, "Response body content");
