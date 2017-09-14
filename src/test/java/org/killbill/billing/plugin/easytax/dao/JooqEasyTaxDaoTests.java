@@ -53,12 +53,14 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
 
     private JooqEasyTaxDao dao;
 
+    private UUID tenantId;
     private DateTime now;
     private EasyTaxTaxCode lastTaxCode;
     private EasyTaxTaxation lastTaxation;
 
     @BeforeMethod(groups = "slow")
     public void setUp() throws SQLException, IOException {
+        tenantId = UUID.randomUUID();
         dao = new JooqEasyTaxDao(embeddedDB.getDataSource());
         now = new DateTime().secondOfMinute().roundFloorCopy();
     }
@@ -66,7 +68,7 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
     @Test(groups = "slow")
     public void createTaxCode() throws SQLException {
         final EasyTaxTaxCode taxCode = new EasyTaxTaxCode();
-        taxCode.setKbTenantId(UUID.randomUUID());
+        taxCode.setKbTenantId(tenantId);
         taxCode.setTaxZone(UUID.randomUUID().toString());
         taxCode.setProductName(UUID.randomUUID().toString());
         taxCode.setTaxCode(UUID.randomUUID().toString());
@@ -100,7 +102,7 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
     @Test(groups = "slow")
     public void createTaxCodes() throws SQLException {
         final EasyTaxTaxCode taxCode = new EasyTaxTaxCode();
-        taxCode.setKbTenantId(UUID.randomUUID());
+        taxCode.setKbTenantId(tenantId);
         taxCode.setTaxZone(UUID.randomUUID().toString());
         taxCode.setProductName(UUID.randomUUID().toString());
         taxCode.setTaxCode(UUID.randomUUID().toString());
@@ -193,7 +195,7 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
 
         // save initial tax code, with no valid to date
         final EasyTaxTaxCode taxCode = new EasyTaxTaxCode();
-        taxCode.setKbTenantId(UUID.randomUUID());
+        taxCode.setKbTenantId(tenantId);
         taxCode.setTaxZone(UUID.randomUUID().toString());
         taxCode.setProductName(UUID.randomUUID().toString());
         taxCode.setTaxCode(UUID.randomUUID().toString());
@@ -267,11 +269,67 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
     }
 
     @Test(groups = "slow")
+    public void removeTaxCode() throws SQLException {
+        createTaxCode();
+        int result = dao.removeTaxCodes(lastTaxCode.getKbTenantId(), lastTaxCode.getTaxZone(),
+                lastTaxCode.getProductName(), lastTaxCode.getTaxCode());
+        assertEquals(result, 1, "Delete count");
+        assertEquals(dao.getTaxCodes(lastTaxCode.getKbTenantId(), null, null, null, null).size(), 0,
+                "Deleted records not found");
+    }
+
+    @Test(groups = "slow")
+    public void removeTaxCodesForProduct() throws SQLException {
+        getTaxCodesForProductMulti();
+        List<EasyTaxTaxCode> codes = dao.getTaxCodes(lastTaxCode.getKbTenantId(),
+                lastTaxCode.getTaxZone(), lastTaxCode.getProductName(), null, null);
+        assertEquals(codes.size(), 3, "Available codes for product");
+        int result = dao.removeTaxCodes(lastTaxCode.getKbTenantId(), lastTaxCode.getTaxZone(),
+                lastTaxCode.getProductName(), null);
+        assertEquals(result, codes.size(), "Delete count");
+        assertEquals(
+                dao.getTaxCodes(lastTaxCode.getKbTenantId(), lastTaxCode.getTaxZone(),
+                        lastTaxCode.getProductName(), null, null).size(),
+                0, "Deleted records not found");
+    }
+
+    @Test(groups = "slow")
+    public void removeTaxCodesForTaxZone() throws SQLException {
+        getTaxCodesForProductMulti();
+
+        EasyTaxTaxCode otherProduct = new EasyTaxTaxCode(lastTaxCode);
+        otherProduct.setProductName(UUID.randomUUID().toString());
+        dao.saveTaxCode(otherProduct);
+        assertEquals(dao.getTaxCodes(lastTaxCode.getKbTenantId(), lastTaxCode.getTaxZone(), null,
+                null, null).size(), 4, "Available codes for zone");
+
+        int result = dao.removeTaxCodes(lastTaxCode.getKbTenantId(), lastTaxCode.getTaxZone(), null,
+                null);
+        assertEquals(result, 4, "Delete count");
+        assertEquals(dao.getTaxCodes(lastTaxCode.getKbTenantId(), lastTaxCode.getTaxZone(), null,
+                null, null).size(), 0, "Deleted records not found");
+    }
+
+    @Test(groups = "slow")
+    public void removeTaxCodesForTenant() throws SQLException {
+        getTaxCodesForProductMulti();
+        getTaxCodesForProductMulti(); // add 2nd for new random product
+
+        assertEquals(dao.getTaxCodes(lastTaxCode.getKbTenantId(), null, null, null, null).size(), 6,
+                "Available codes for tenant");
+
+        int result = dao.removeTaxCodes(lastTaxCode.getKbTenantId(), null, null, null);
+        assertEquals(result, 6, "Delete count");
+        assertEquals(dao.getTaxCodes(lastTaxCode.getKbTenantId(), null, null, null, null).size(), 0,
+                "Deleted records not found");
+    }
+
+    @Test(groups = "slow")
     public void saveTaxation() throws SQLException {
         final DateTime now = new DateTime().secondOfMinute().roundFloorCopy();
         EasyTaxTaxation taxation = new EasyTaxTaxation();
         taxation.setCreatedDate(now);
-        taxation.setKbTenantId(UUID.randomUUID());
+        taxation.setKbTenantId(tenantId);
         taxation.setKbAccountId(UUID.randomUUID());
         taxation.setKbInvoiceId(UUID.randomUUID());
         taxation.setTotalTax(new BigDecimal("1.50"));
@@ -319,7 +377,7 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
         final DateTime now = new DateTime().secondOfMinute().roundFloorCopy();
         EasyTaxTaxation template = new EasyTaxTaxation();
         template.setCreatedDate(now);
-        template.setKbTenantId(UUID.randomUUID());
+        template.setKbTenantId(tenantId);
         template.setKbAccountId(UUID.randomUUID());
         template.setKbInvoiceId(UUID.randomUUID());
         List<EasyTaxTaxation> saved = saveTaxations(template, 3);
@@ -338,7 +396,7 @@ public class JooqEasyTaxDaoTests extends TestWithEmbeddedDBBase {
             final DateTime now = new DateTime().secondOfMinute().roundFloorCopy();
             EasyTaxTaxation template = new EasyTaxTaxation();
             template.setCreatedDate(now);
-            template.setKbTenantId(UUID.randomUUID());
+            template.setKbTenantId(tenantId);
             template.setKbAccountId(UUID.randomUUID());
             template.setKbInvoiceId(UUID.randomUUID());
             List<EasyTaxTaxation> saved = saveTaxations(template,

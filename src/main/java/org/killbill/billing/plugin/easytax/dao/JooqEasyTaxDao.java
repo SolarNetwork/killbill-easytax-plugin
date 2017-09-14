@@ -133,7 +133,7 @@ public class JooqEasyTaxDao extends PluginDao implements EasyTaxDao {
                         .using(conn, dialect, settings).delete(EASYTAX_TAX_CODES)
                         .where(EASYTAX_TAX_CODES.KB_TENANT_ID.equal(kbTenantId.toString()));
                 if (taxZone != null) {
-                    delete = delete.and(EASYTAX_TAX_CODES.TAX_ZONE.equal(productName));
+                    delete = delete.and(EASYTAX_TAX_CODES.TAX_ZONE.equal(taxZone));
                 }
                 if (productName != null) {
                     delete = delete.and(EASYTAX_TAX_CODES.PRODUCT_NAME.equal(productName));
