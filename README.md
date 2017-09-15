@@ -103,6 +103,11 @@ the action to a more selective set of rates. The endpoint supports the following
    date can be easily adjusted when a tax rate changes.
  * `DELETE`: delete one or more tax rates.
 
+### Authentication
+
+The `DELETE` and `POST` requests require an authenticated user with the `catalog:config_upload`
+permission.
+
 ### Tax rate JSON syntax
 
 A tax rate object looks like this:

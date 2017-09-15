@@ -18,12 +18,17 @@ package org.killbill.billing.plugin.easytax.core;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
@@ -34,8 +39,14 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
 import org.killbill.billing.plugin.core.PluginServlet;
 import org.killbill.billing.plugin.easytax.api.EasyTaxDao;
+import org.killbill.billing.plugin.easytax.api.EasyTaxTenantContext;
+import org.killbill.billing.security.Permission;
+import org.killbill.billing.security.api.SecurityApi;
 import org.killbill.billing.tenant.api.Tenant;
+import org.killbill.billing.util.callcontext.TenantContext;
 import org.killbill.clock.Clock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,7 +57,7 @@ import com.fasterxml.jackson.datatype.joda.JodaModule;
 
 public class EasyTaxServlet extends PluginServlet {
 
-    private static final long serialVersionUID = -85672396888778584L;
+    private static final long serialVersionUID = 6708142031245973366L;
 
     /**
      * A boolean request parameter to find only with a valid date set to the system time.
@@ -86,12 +97,29 @@ public class EasyTaxServlet extends PluginServlet {
     private static final Pattern TAX_CODES_URL_PATTERN = Pattern
             .compile("/taxCodes(/([^/]+)(/([^/]+))?(/([^/]+))?)?");
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
     private final EasyTaxDao dao;
     private final Clock clock;
+    private final SecurityApi securityApi;
 
-    public EasyTaxServlet(final EasyTaxDao dao, final Clock clock) {
+    private Set<Permission> requiredModifyPermissions = Collections
+            .singleton(Permission.CATALOG_CAN_UPLOAD);
+
+    /**
+     * Constructor.
+     * 
+     * @param dao
+     *            the DAO to use
+     * @param clock
+     *            the clock to use
+     * @param securityApi
+     *            the security API to use for authenticating users
+     */
+    public EasyTaxServlet(final EasyTaxDao dao, final Clock clock, final SecurityApi securityApi) {
         this.dao = dao;
         this.clock = clock;
+        this.securityApi = securityApi;
     }
 
     /**
@@ -215,6 +243,9 @@ public class EasyTaxServlet extends PluginServlet {
             buildNotFoundResponse("No tenant specified", resp);
             return;
         }
+        if (notAllowed(tenant, this.requiredModifyPermissions, req, resp)) {
+            return;
+        }
 
         final String pathInfo = req.getPathInfo();
         final Matcher matcher = TAX_CODES_URL_PATTERN.matcher(pathInfo);
@@ -278,6 +309,9 @@ public class EasyTaxServlet extends PluginServlet {
         final Tenant tenant = getTenant(req);
         if (tenant == null) {
             buildNotFoundResponse("No tenant specified", resp);
+            return;
+        }
+        if (notAllowed(tenant, this.requiredModifyPermissions, req, resp)) {
             return;
         }
 
@@ -365,6 +399,84 @@ public class EasyTaxServlet extends PluginServlet {
         }
 
         buildOKResponse(null, resp);
+    }
+
+    private boolean notAllowed(Tenant tenant, Set<Permission> required, HttpServletRequest req,
+            HttpServletResponse resp) throws IOException {
+        int result = checkPermission(tenant, required, req);
+        if (result != 0) {
+            buildResponse(result, null, resp);
+            return true;
+        }
+        return false;
+    }
+
+    private int checkPermission(Tenant tenant, Set<Permission> required, HttpServletRequest req) {
+        if (required.isEmpty()) {
+            return 0;
+        }
+        String authHeader = req.getHeader("Authorization");
+        if (authHeader == null) {
+            return 401;
+        }
+
+        final String[] authHeaderComponents = authHeader.split(" ");
+        if (authHeaderComponents.length < 2) {
+            return 403;
+        }
+
+        try {
+            final String credentials = new String(
+                    Base64.getDecoder().decode(authHeaderComponents[1]), "UTF-8").trim();
+            final String[] credentialComponents = credentials.split(":", 2);
+            if (credentialComponents.length < 2) {
+                return 403;
+            }
+
+            securityApi.login(credentialComponents[0], credentialComponents[1]);
+            TenantContext context = new EasyTaxTenantContext(tenant.getId(), null);
+            Set<Permission> granted = securityApi.getCurrentUserPermissions(context);
+            if (granted == null) {
+                return 403;
+            }
+            if (granted.containsAll(required)) {
+                return 0;
+            }
+        } catch (Exception e) {
+            // ignore and deny
+            log.info("Permission check failed for Authorization header {}: {}", authHeader,
+                    e.getMessage());
+        }
+        return 403;
+    }
+
+    /**
+     * Get the set of permissions that are required to perform modifications.
+     * 
+     * @return the set of permissions (never {@literal null})
+     */
+    public Set<Permission> getRequiredModifyPermissions() {
+        return requiredModifyPermissions;
+    }
+
+    /**
+     * Set a {@code Set} of permissions that are required to perform modifications.
+     * 
+     * <p>
+     * To not require any permissions, set this to an empty Set.
+     * </p>
+     * 
+     * @param requiredModifyPermissions
+     *            the set of permissions to require
+     */
+    public void setRequiredModifyPermissions(@Nonnull Set<Permission> requiredModifyPermissions) {
+        if (requiredModifyPermissions == null) {
+            requiredModifyPermissions = Collections.emptySet();
+        } else {
+            requiredModifyPermissions = Collections
+                    .unmodifiableSet(new HashSet<>(requiredModifyPermissions));
+        }
+        this.requiredModifyPermissions = requiredModifyPermissions;
     }
 
 }

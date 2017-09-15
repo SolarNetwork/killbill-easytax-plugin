@@ -15,6 +15,7 @@
 
 package org.killbill.billing.plugin.easytax.core;
 
+import static java.util.Collections.singleton;
 import static org.killbill.billing.plugin.easytax.EasyTaxTestUtils.assertDateTimeEquals;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -26,11 +27,14 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.servlet.ReadListener;
@@ -44,9 +48,14 @@ import javax.servlet.http.HttpServletResponse;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.killbill.billing.plugin.easytax.api.EasyTaxDao;
+import org.killbill.billing.security.Permission;
+import org.killbill.billing.security.api.SecurityApi;
 import org.killbill.billing.tenant.api.Tenant;
+import org.killbill.billing.util.callcontext.TenantContext;
 import org.killbill.clock.Clock;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
+import org.mockito.Matchers;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -60,8 +69,14 @@ import com.google.common.net.HttpHeaders;
  */
 public class EasyTaxServletTests {
 
+    private static final String TEST_PASSWORD = "password";
+    private static final String TEST_USER = "admin";
+    private static final Set<Permission> TEST_PERMISSIONS = singleton(
+            Permission.CATALOG_CAN_UPLOAD);
+
     private EasyTaxDao dao;
     private Clock clock;
+    private SecurityApi securityApi;
     private HttpServletRequest req;
     private HttpServletResponse res;
     private EasyTaxServlet servlet;
@@ -76,9 +91,46 @@ public class EasyTaxServletTests {
         tenant = mock(Tenant.class);
         clock = mock(Clock.class);
         dao = mock(EasyTaxDao.class);
-        servlet = new EasyTaxServlet(dao, clock);
+        securityApi = mock(SecurityApi.class);
+        servlet = new EasyTaxServlet(dao, clock, securityApi);
         req = mock(HttpServletRequest.class);
         res = mock(HttpServletResponse.class);
+    }
+
+    private void givenPermissions(String username, String password, Set<Permission> permissions) {
+        String credentials = username + ":" + password;
+        try {
+            String authHeaderValue = "Basic "
+                    + Base64.getEncoder().encodeToString(credentials.getBytes("UTF-8"));
+            given(req.getHeader("Authorization")).willReturn(authHeaderValue);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        given(securityApi.isSubjectAuthenticated()).willReturn(true);
+        given(securityApi
+                .getCurrentUserPermissions(Matchers.argThat(new ArgumentMatcher<TenantContext>() {
+
+                    @Override
+                    public boolean matches(Object arg) {
+                        return (arg instanceof TenantContext
+                                && tenantId.equals(((TenantContext) arg).getTenantId()));
+                    }
+
+                }))).willReturn(permissions);
+    }
+
+    private void thenAuthenticatedAs(String username, String password) {
+        then(securityApi).should().login(username, password);
+    }
+
+    private ByteArrayOutputStream givenTenantlessServletCall(String method, String path)
+            throws IOException {
+        return givenTenantlessServletCall(method, path, null, 0, null);
+    }
+
+    private ByteArrayOutputStream givenTenantlessServletCall(String method, String path,
+            InputStream content, int contentLength, String contentType) throws IOException {
+        return givenServletCall(null, method, path, content, contentLength, contentType);
     }
 
     private ByteArrayOutputStream givenDefaultServletCall(String method, String path)
@@ -88,9 +140,16 @@ public class EasyTaxServletTests {
 
     private ByteArrayOutputStream givenDefaultServletCall(String method, String path,
             InputStream content, int contentLength, String contentType) throws IOException {
-        given(tenant.getId()).willReturn(tenantId);
+        return givenServletCall(tenantId, method, path, content, contentLength, contentType);
+    }
+
+    private ByteArrayOutputStream givenServletCall(UUID tenantId, String method, String path,
+            InputStream content, int contentLength, String contentType) throws IOException {
+        if (tenantId != null) {
+            given(tenant.getId()).willReturn(tenantId);
+            given(req.getAttribute("killbill_tenant")).willReturn(tenant);
+        }
         given(clock.getUTCNow()).willReturn(now);
-        given(req.getAttribute("killbill_tenant")).willReturn(tenant);
         given(req.getMethod()).willReturn(method);
         given(req.getPathInfo()).willReturn(path);
         if (contentType != null) {
@@ -170,6 +229,56 @@ public class EasyTaxServletTests {
         }
     }
 
+    private void thenErrorResponse(int status, String msg) throws IOException {
+        then(res).should().sendError(status, msg);
+    }
+
+    @Test(groups = "fast")
+    public void getUnknownPath() throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenDefaultServletCall("GET", "/shazam");
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenErrorResponse(404, "Resource /shazam not found");
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void postUnknownPath() throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/shazam");
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
+        thenErrorResponse(404, "Resource /shazam not found");
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void deleteUnknownPath() throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/shazam");
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
+        thenErrorResponse(404, "Resource /shazam not found");
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
     @Test(groups = "fast")
     public void getAllTaxCodes() throws IOException, ServletException, SQLException {
         // given
@@ -188,6 +297,20 @@ public class EasyTaxServletTests {
         assertEquals(byos.toString("UTF-8"),
                 "[{\"tax_code\":\"" + taxCodes.get(0).getTaxCode() + "\"}]",
                 "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void getAllTaxCodesTenantless() throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenTenantlessServletCall("GET", "/taxCodes");
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenErrorResponse(404, "No tenant specified");
+
+        assertEquals(byos.size(), 0, "Response body content");
     }
 
     @Test(groups = "fast")
@@ -347,13 +470,14 @@ public class EasyTaxServletTests {
     public void deleteAllTaxCodes() throws IOException, ServletException, SQLException {
         // given
         ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/taxCodes");
-
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
         given(dao.removeTaxCodes(tenantId, null, null, null)).willReturn(1);
 
         // when
         servlet.service(req, res);
 
         // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
         then(dao).should().removeTaxCodes(tenantId, null, null, null);
         thenDefaultOkResponse();
 
@@ -361,16 +485,63 @@ public class EasyTaxServletTests {
     }
 
     @Test(groups = "fast")
+    public void deleteAllTaxCodesNotPermitted() throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/taxCodes");
+        givenPermissions(TEST_USER, TEST_PASSWORD, singleton(Permission.USER_CAN_VIEW));
+        given(dao.removeTaxCodes(tenantId, null, null, null)).willReturn(1);
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenDefaultResponse(403, null);
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void deleteAllTaxCodesNotAuthenticated()
+            throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/taxCodes");
+        given(dao.removeTaxCodes(tenantId, null, null, null)).willReturn(1);
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenDefaultResponse(401, null);
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void deleteAllTaxCodesTenantless() throws IOException, ServletException, SQLException {
+        // given
+        ByteArrayOutputStream byos = givenTenantlessServletCall("DELETE", "/taxCodes");
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenErrorResponse(404, "No tenant specified");
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
     public void deleteTaxCodesForTaxZone() throws IOException, ServletException, SQLException {
         // given
         ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/taxCodes/NZ");
-
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
         given(dao.removeTaxCodes(tenantId, "NZ", null, null)).willReturn(1);
 
         // when
         servlet.service(req, res);
 
         // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
         then(dao).should().removeTaxCodes(tenantId, "NZ", null, null);
         thenDefaultOkResponse();
 
@@ -382,13 +553,14 @@ public class EasyTaxServletTests {
             throws IOException, ServletException, SQLException {
         // given
         ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/taxCodes/NZ/memory-use");
-
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
         given(dao.removeTaxCodes(tenantId, "NZ", "memory-use", null)).willReturn(1);
 
         // when
         servlet.service(req, res);
 
         // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
         then(dao).should().removeTaxCodes(tenantId, "NZ", "memory-use", null);
         thenDefaultOkResponse();
 
@@ -401,13 +573,14 @@ public class EasyTaxServletTests {
         // given
         ByteArrayOutputStream byos = givenDefaultServletCall("DELETE",
                 "/taxCodes/NZ/memory-use/GST");
-
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
         given(dao.removeTaxCodes(tenantId, "NZ", "memory-use", "GST")).willReturn(1);
 
         // when
         servlet.service(req, res);
 
         // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
         then(dao).should().removeTaxCodes(tenantId, "NZ", "memory-use", "GST");
         thenDefaultOkResponse();
 
@@ -420,14 +593,15 @@ public class EasyTaxServletTests {
         byte[] data = "{\"tax_rate\":\"0.15\",\"valid_from_date\":\"2017-01-01T12:00:00Z\"}"
                 .getBytes("UTF-8");
         ByteArrayInputStream byis = new ByteArrayInputStream(data);
-
         ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/taxCodes/NZ/memory-use/GST",
                 byis, data.length, EasyTaxServlet.APPLICATION_JSON_UTF8);
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
 
         // when
         servlet.service(req, res);
 
         // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
         thenDefaultResponse(201, null);
         then(res).should().setHeader(HttpHeaders.LOCATION,
                 "/plugins/killbill-easytax/taxCodes/NZ/memory-use/GST");
@@ -448,20 +622,78 @@ public class EasyTaxServletTests {
         assertNull(saved.getValidToDate(), "Valid to date");
     }
 
-    @SuppressWarnings("unchecked")
     @Test(groups = "fast")
-    public void addTaxCodes() throws IOException, ServletException, SQLException {
+    public void addTaxCodeNotPermitted() throws IOException, ServletException, SQLException {
         // given
-        byte[] data = Resources.toByteArray(Resources.getResource(getClass(), "tax-codes-01.json"));
+        byte[] data = "{\"tax_rate\":\"0.15\",\"valid_from_date\":\"2017-01-01T12:00:00Z\"}"
+                .getBytes("UTF-8");
         ByteArrayInputStream byis = new ByteArrayInputStream(data);
+        ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/taxCodes/NZ/memory-use/GST",
+                byis, data.length, EasyTaxServlet.APPLICATION_JSON_UTF8);
+        givenPermissions(TEST_USER, TEST_PASSWORD, singleton(Permission.USER_CAN_VIEW));
 
-        ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/taxCodes", byis, data.length,
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
+        thenDefaultResponse(403, null);
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void addTaxCodeNotAuthenticated() throws IOException, ServletException, SQLException {
+        // given
+        byte[] data = "{\"tax_rate\":\"0.15\",\"valid_from_date\":\"2017-01-01T12:00:00Z\"}"
+                .getBytes("UTF-8");
+        ByteArrayInputStream byis = new ByteArrayInputStream(data);
+        ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/taxCodes/NZ/memory-use/GST",
+                byis, data.length, EasyTaxServlet.APPLICATION_JSON_UTF8);
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenDefaultResponse(401, null);
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @Test(groups = "fast")
+    public void addTaxCodeTenantless() throws IOException, ServletException, SQLException {
+        // given
+        byte[] data = "{\"tax_rate\":\"0.15\",\"valid_from_date\":\"2017-01-01T12:00:00Z\"}"
+                .getBytes("UTF-8");
+        ByteArrayInputStream byis = new ByteArrayInputStream(data);
+        ByteArrayOutputStream byos = givenTenantlessServletCall("POST",
+                "/taxCodes/NZ/memory-use/GST", byis, data.length,
                 EasyTaxServlet.APPLICATION_JSON_UTF8);
 
         // when
         servlet.service(req, res);
 
         // then
+        thenErrorResponse(404, "No tenant specified");
+
+        assertEquals(byos.size(), 0, "Response body content");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test(groups = "fast")
+    public void addTaxCodes() throws IOException, ServletException, SQLException {
+        // given
+        byte[] data = Resources.toByteArray(Resources.getResource(getClass(), "tax-codes-01.json"));
+        ByteArrayInputStream byis = new ByteArrayInputStream(data);
+        ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/taxCodes", byis, data.length,
+                EasyTaxServlet.APPLICATION_JSON_UTF8);
+        givenPermissions(TEST_USER, TEST_PASSWORD, TEST_PERMISSIONS);
+
+        // when
+        servlet.service(req, res);
+
+        // then
+        thenAuthenticatedAs(TEST_USER, TEST_PASSWORD);
         thenDefaultOkResponse();
 
         @SuppressWarnings("rawtypes")

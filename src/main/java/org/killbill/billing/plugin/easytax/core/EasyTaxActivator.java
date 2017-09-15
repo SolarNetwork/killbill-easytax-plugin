@@ -68,7 +68,7 @@ public class EasyTaxActivator extends KillbillActivatorBase {
                 logService, clock);
         registerInvoicePluginApi(context, invoicePluginApi);
 
-        final HttpServlet servlet = new EasyTaxServlet(dao, clock);
+        final HttpServlet servlet = new EasyTaxServlet(dao, clock, killbillAPI.getSecurityApi());
         registerServlet(context, servlet);
 
         registerEventHandler();

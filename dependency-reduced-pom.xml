@@ -206,6 +206,7 @@
                             org.killbill.billing.util.api;
                             org.killbill.billing.currency.plugin.api;
                             org.killbill.billing.currency.api;
+                            org.killbill.billing.security;
                             org.killbill.billing.security.api;
                             org.xml.sax.ext;
                             org.xml.sax.helpers;
