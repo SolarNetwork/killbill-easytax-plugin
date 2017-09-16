@@ -21,7 +21,9 @@ import static org.testng.Assert.assertEquals;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.joda.time.DateTime;
@@ -179,6 +181,44 @@ public final class EasyTaxTestUtils {
         assertEquals(actual.getKbInvoiceId(), expected.getKbInvoiceId(), msg + " Invoice ID");
         assertEquals(actual.getKbTenantId(), expected.getKbTenantId(), msg + " Tenant ID");
         assertBigDecimalEquals(actual.getTotalTax(), expected.getTotalTax(), 2, msg + " Total tax");
+    }
+
+    private static String prettyPrintInvoiceItemHeader() {
+        return String.format(" %-8.8s | %-8.8s | %-8.8s | %6.6s | %-8.8s", "Item ID", "Type",
+                "Desc", "Amount", "Linked")
+                + "\n----------+----------+----------+--------+---------\n";
+    }
+
+    private static String prettyPrintInvoiceItem(InvoiceItem item) {
+        return String.format(" %-8.8s | %-8.8s | %-8.8s | %6.2f | %-8.8s", item.getId(),
+                item.getInvoiceItemType(), item.getDescription(), item.getAmount(),
+                item.getLinkedItemId() != null ? item.getLinkedItemId() : "");
+    }
+
+    public static String prettyPrintInvoiceAndComputedTaxItems(Collection<InvoiceItem> taxableItems,
+            Map<UUID, Collection<InvoiceItem>> adjustmentItems, Collection<InvoiceItem> items) {
+        StringBuffer buf = new StringBuffer();
+        buf.append("Taxable items:\n");
+        if (taxableItems != null && !taxableItems.isEmpty()) {
+            buf.append(prettyPrintInvoiceItemHeader());
+            for (InvoiceItem item : taxableItems) {
+                buf.append(prettyPrintInvoiceItem(item)).append('\n');
+            }
+        }
+        if (adjustmentItems != null && !adjustmentItems.isEmpty()) {
+            for (Collection<InvoiceItem> adjItems : adjustmentItems.values()) {
+                for (InvoiceItem item : adjItems) {
+                    buf.append(prettyPrintInvoiceItem(item)).append('\n');
+                }
+            }
+        }
+        buf.append("\nComputed tax items:\n");
+        if (items != null && !items.isEmpty()) {
+            for (InvoiceItem item : items) {
+                buf.append(prettyPrintInvoiceItem(item)).append('\n');
+            }
+        }
+        return buf.toString();
     }
 
 }
