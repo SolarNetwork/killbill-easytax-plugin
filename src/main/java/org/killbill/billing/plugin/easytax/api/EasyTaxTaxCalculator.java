@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
@@ -239,6 +240,10 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
 
             // sum up total new tax and update the mapping of taxable -> tax item IDs
             Map<UUID, Set<UUID>> taxedItemsWithAdjustments = new HashMap<>();
+            for (Map.Entry<UUID, Collection<InvoiceItem>> entry : adjustmentItems.entrySet()) {
+                taxedItemsWithAdjustments.put(entry.getKey(), entry.getValue().stream()
+                        .map(item -> item.getId()).collect(Collectors.toSet()));
+            }
             BigDecimal totalTax = BigDecimal.ZERO;
             for (InvoiceItem item : newTaxInvoiceItems) {
                 totalTax = totalTax.add(item.getAmount());
@@ -281,7 +286,11 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
                 } else {
                     alreadyTaxed = new HashMap<>();
                     for (EasyTaxTaxation taxation : taxations) {
-                        alreadyTaxed.putAll(taxation.getInvoiceItemIds());
+                        for (Map.Entry<UUID, Set<UUID>> entry : taxation.getInvoiceItemIds()
+                                .entrySet()) {
+                            alreadyTaxed.computeIfAbsent(entry.getKey(), k -> new HashSet<>())
+                                    .addAll(entry.getValue());
+                        }
                     }
                 }
             }

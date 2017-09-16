@@ -22,6 +22,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.killbill.billing.plugin.easytax.EasyTaxTestUtils.assertBigDecimalEquals;
 import static org.killbill.billing.plugin.easytax.EasyTaxTestUtils.createOptionalService;
+import static org.killbill.billing.plugin.easytax.EasyTaxTestUtils.prettyPrintInvoiceAndComputedTaxItems;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Matchers.any;
@@ -57,6 +58,7 @@ import org.killbill.billing.osgi.libs.killbill.OSGIKillbillLogService;
 import org.killbill.billing.plugin.TestUtils;
 import org.killbill.billing.plugin.api.invoice.PluginTaxCalculator;
 import org.killbill.billing.plugin.easytax.CatalogUtils;
+import org.killbill.billing.plugin.easytax.EasyTaxTestUtils;
 import org.killbill.billing.plugin.easytax.core.EasyTaxActivator;
 import org.killbill.billing.plugin.easytax.core.EasyTaxConfig;
 import org.killbill.billing.plugin.easytax.core.EasyTaxConfigurationHandler;
@@ -206,6 +208,9 @@ public class EasyTaxTaxCalculatorTests {
         final List<InvoiceItem> initialTaxItems = calculator.compute(account1, newInvoice1, invoice,
                 taxableItems1, adjustmentItems1, false, emptyList(), tenantId);
 
+        log.info(EasyTaxTestUtils.prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(),
+                adjustmentItems1, initialTaxItems));
+
         // then
         assertEquals(initialTaxItems.size(), 1);
         InvoiceItem taxItem1 = initialTaxItems.get(0);
@@ -229,43 +234,6 @@ public class EasyTaxTaxCalculatorTests {
                 Collections.singleton(taxItem1.getId())));
         assertBigDecimalEquals(taxation.getTotalTax(), taxItem1.getAmount(), 2,
                 "Taxation total tax");
-    }
-
-    private String prettyPrintInvoiceItemHeader() {
-        return String.format(" %-8.8s | %8.8s | %6.6s | %8.8s", "Item ID", "Type", "Amount",
-                "Linked") + "\n----------+----------+--------+---------\n";
-    }
-
-    private String prettyPrintInvoiceItem(InvoiceItem item) {
-        return String.format(" %-8.8s | %8.8s | %6.2f | %8.8s", item.getId(),
-                item.getInvoiceItemType(), item.getAmount(),
-                item.getLinkedItemId() != null ? item.getLinkedItemId() : "");
-    }
-
-    private String prettyPrintInvoiceAndComputedTaxItems(Collection<InvoiceItem> taxableItems,
-            Map<UUID, Collection<InvoiceItem>> adjustmentItems, Collection<InvoiceItem> items) {
-        StringBuffer buf = new StringBuffer();
-        buf.append("Taxable items:\n");
-        if (taxableItems != null && !taxableItems.isEmpty()) {
-            buf.append(prettyPrintInvoiceItemHeader());
-            for (InvoiceItem item : taxableItems) {
-                buf.append(prettyPrintInvoiceItem(item)).append('\n');
-            }
-        }
-        if (adjustmentItems != null && !adjustmentItems.isEmpty()) {
-            for (Collection<InvoiceItem> adjItems : adjustmentItems.values()) {
-                for (InvoiceItem item : adjItems) {
-                    buf.append(prettyPrintInvoiceItem(item)).append('\n');
-                }
-            }
-        }
-        buf.append("\nComputed tax items:\n");
-        if (items != null && !items.isEmpty()) {
-            for (InvoiceItem item : items) {
-                buf.append(prettyPrintInvoiceItem(item)).append('\n');
-            }
-        }
-        return buf.toString();
     }
 
     @Test(groups = "fast")
@@ -332,7 +300,7 @@ public class EasyTaxTaxCalculatorTests {
                 "Total tax adjusted $100-$1 @ 15%");
     }
 
-    @Test(enabled = false, description = "TODO: this test needs work")
+    @Test(enabled = true, description = "TODO: this test needs work")
     public void invoiceItemsOverTime() throws Exception {
         // given
         final PluginTaxCalculator calculator = calculatorWithConfig(config);
@@ -370,10 +338,17 @@ public class EasyTaxTaxCalculatorTests {
         // no taxation records exist yet
         given(dao.getTaxation(tenantId, account.getId(), invoice.getId())).willReturn(emptyList());
 
+        // verify what was stored in the taxation table
+        ArgumentCaptor<EasyTaxTaxation> taxationCaptor = ArgumentCaptor
+                .forClass(EasyTaxTaxation.class);
+        Mockito.doNothing().when(dao).addTaxation(taxationCaptor.capture());
+
         // when
 
         final List<InvoiceItem> initialTaxItems = calculator.compute(account, newInvoice, invoice,
                 taxableItems1, initialAdjustmentItems, false, emptyList(), tenantId);
+        log.info(EasyTaxTestUtils.prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(),
+                initialAdjustmentItems, initialTaxItems));
 
         // then
         checkCreatedItems(ImmutableMap.<UUID, InvoiceItemType>of(taxableItem1.getId(),
@@ -382,23 +357,19 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(initialTaxItems.size(), 2, "Initial tax item count for $100, $10");
         InvoiceItem taxItem1 = initialTaxItems.get(0);
         assertEquals(taxItem1.getAccountId(), account.getId());
-        assertEquals(taxItem1.getInvoiceId(), invoice.getId());
+        assertEquals(taxItem1.getInvoiceId(), newInvoice.getId());
         assertEquals(taxItem1.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem1.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
         assertBigDecimalEquals(taxItem1.getAmount(),
                 taxableItem1.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
-        InvoiceItem taxItem2 = initialTaxItems.get(0);
+
+        InvoiceItem taxItem2 = initialTaxItems.get(1);
         assertEquals(taxItem2.getAccountId(), account.getId());
-        assertEquals(taxItem2.getInvoiceId(), invoice.getId());
+        assertEquals(taxItem2.getInvoiceId(), newInvoice.getId());
         assertEquals(taxItem2.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem2.getLinkedItemId(), taxableItem2.getId(), "Linked to taxable item");
         assertBigDecimalEquals(taxItem2.getAmount(),
                 taxableItem2.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
-
-        // verify what was stored in the taxation table
-        ArgumentCaptor<EasyTaxTaxation> taxationCaptor = ArgumentCaptor
-                .forClass(EasyTaxTaxation.class);
-        then(dao).should().addTaxation(taxationCaptor.capture());
 
         EasyTaxTaxation taxation = taxationCaptor.getValue();
         assertEquals(taxation.getKbTenantId(), tenantId, "Taxation tenant");
@@ -432,6 +403,8 @@ public class EasyTaxTaxCalculatorTests {
         // when
         final List<InvoiceItem> adjustments1 = calculator.compute(account, newInvoice, invoice,
                 taxableItems1, subsequentAdjustmentItems1, false, emptyList(), tenantId);
+        log.info(prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(),
+                subsequentAdjustmentItems1, adjustments1));
 
         // then
         checkCreatedItems(
@@ -439,38 +412,40 @@ public class EasyTaxTaxCalculatorTests {
                 adjustments1, newInvoice);
         assertEquals(adjustments1.size(), 1, "Adjustment tax item count for $100-$1");
 
-        // verify what was stored in the taxation table
-        then(dao).should(Mockito.times(2)).addTaxation(taxationCaptor.capture());
-
         assertEquals(adjustments1.get(0).getAccountId(), account.getId());
         assertEquals(adjustments1.get(0).getInvoiceId(), newInvoice.getId());
         assertEquals(adjustments1.get(0).getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(adjustments1.get(0).getLinkedItemId(), taxableItem1.getId(),
                 "Linked to taxable item");
-        assertBigDecimalEquals(
-                adjustments1.get(0).getAmount(), taxableItem1.getAmount()
-                        .add(adjustment1ForInvoiceItem1.getAmount()).multiply(TEST_TAX_RATE),
-                2, "Tax amount for $100-$1");
+        assertBigDecimalEquals(adjustments1.get(0).getAmount(),
+                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2,
+                "Tax amount for -$1 adjustment");
 
+        assertEquals(taxationCaptor.getAllValues().size(), 2, "Taxation record added");
         EasyTaxTaxation taxation2 = taxationCaptor.getValue();
         assertEquals(taxation2.getKbTenantId(), tenantId, "Taxation tenant");
         assertEquals(taxation2.getKbAccountId(), account.getId(), "Taxation account");
         assertEquals(taxation2.getKbInvoiceId(), invoice.getId(), "Taxation invoice");
-        assertEquals(taxation2.getInvoiceItemIds(), ImmutableMap.of(taxableItem1.getId(),
-                Collections.singleton(adjustments1.get(0).getId())));
-        assertBigDecimalEquals(
-                taxation2.getTotalTax(), taxableItem1.getAmount()
-                        .add(adjustment1ForInvoiceItem1.getAmount()).multiply(TEST_TAX_RATE),
-                2, "Total tax for $100 purchase - $1 adjustment");
+        assertEquals(taxation2.getInvoiceItemIds(),
+                ImmutableMap.of(taxableItem1.getId(),
+                        new HashSet<>(Arrays.asList(adjustments1.get(0).getId(),
+                                adjustment1ForInvoiceItem1.getId()))),
+                "Taxaction records new tax and adjustment references");
+        assertBigDecimalEquals(taxation2.getTotalTax(),
+                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2,
+                "Total tax for $1 adjustment");
 
-        // given 1 taxation record exists now
+        // given 2 taxation record2 exist now
         taxation2.setRecordId(RECORD_ID.incrementAndGet()); // assign unique ID like DB would
         given(dao.getTaxation(tenantId, account.getId(), invoice.getId()))
                 .willReturn(Arrays.asList(taxation, taxation2));
 
         // verify compute is idempotent
-        assertEquals(calculator.compute(account, newInvoice, invoice, taxableItems1,
-                subsequentAdjustmentItems1, false, emptyList(), tenantId).size(), 0);
+        final List<InvoiceItem> adjustments1idemp = calculator.compute(account, newInvoice, invoice,
+                taxableItems1, subsequentAdjustmentItems1, false, emptyList(), tenantId);
+        log.info(prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(),
+                subsequentAdjustmentItems1, adjustments1idemp));
+        assertEquals(adjustments1idemp.size(), 0, "Re-adjustment idempotent");
         assertEquals(taxationCaptor.getAllValues().size(), 2, "Taxation records unchanged");
 
         // Compute a subsequent adjustment (with a new item on a new invoice this time, to simulate
@@ -490,21 +465,51 @@ public class EasyTaxTaxCalculatorTests {
                         ImmutableList.<InvoiceItem>of(adjustment2ForInvoiceItem1),
                         taxableItem2.getId(),
                         ImmutableList.<InvoiceItem>of(adjustment1ForInvoiceItem2));
-        final List<InvoiceItem> adjustments2 = calculator.compute(account, newInvoice, invoice,
-                taxableItems2, subsequentAdjustmentItems2, false, emptyList(), tenantId);
-        List<EasyTaxTaxation> taxations5 = dao.getTaxation(tenantId, account.getId(),
-                invoice.getId());
-        assertEquals(taxations5.size(), 1, "Taxation record count");
-        EasyTaxTaxation taxation5 = taxations5.get(0);
-        assertEquals(taxation5.getKbTenantId(), tenantId, "Tenant ID");
-        // TODO: verify values
+
+        // when
+        final List<InvoiceItem> adjustments2 = calculator.compute(account, newInvoice,
+                adjustmentInvoice, taxableItems2, subsequentAdjustmentItems2, false, emptyList(),
+                tenantId);
+        log.info(EasyTaxTestUtils.prettyPrintInvoiceAndComputedTaxItems(taxableItems2.values(),
+                subsequentAdjustmentItems2, adjustments2));
+
+        // then
 
         // Check the created items
         checkCreatedItems(ImmutableMap.<UUID, InvoiceItemType>of(taxableItem1.getId(),
                 InvoiceItemType.TAX, taxableItem2.getId(), InvoiceItemType.TAX,
                 taxableItem3.getId(), InvoiceItemType.TAX), adjustments2, newInvoice);
+        assertEquals(adjustments2.size(), 1, "Adjustment tax item count for $100-$1");
 
-        // Verify idempotency
+        assertEquals(adjustments2.get(0).getAccountId(), account.getId());
+        assertEquals(adjustments2.get(0).getInvoiceId(), newInvoice.getId());
+        assertEquals(adjustments2.get(0).getInvoiceItemType(), InvoiceItemType.TAX);
+        assertEquals(adjustments2.get(0).getLinkedItemId(), taxableItem1.getId(),
+                "Linked to taxable item");
+        assertBigDecimalEquals(adjustments2.get(0).getAmount(),
+                adjustment2ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2,
+                "Tax amount for -$1 adjustment");
+
+        assertEquals(taxationCaptor.getAllValues().size(), 2, "Taxation record added");
+        EasyTaxTaxation taxation3 = taxationCaptor.getValue();
+        assertEquals(taxation3.getKbTenantId(), tenantId, "Taxation tenant");
+        assertEquals(taxation3.getKbAccountId(), account.getId(), "Taxation account");
+        assertEquals(taxation3.getKbInvoiceId(), invoice.getId(), "Taxation invoice");
+        assertEquals(taxation3.getInvoiceItemIds(),
+                ImmutableMap.of(taxableItem1.getId(),
+                        new HashSet<>(Arrays.asList(adjustments1.get(0).getId(),
+                                adjustment1ForInvoiceItem1.getId()))),
+                "Taxaction records new tax and adjustment references");
+        assertBigDecimalEquals(taxation3.getTotalTax(),
+                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2,
+                "Total tax for $1 adjustment");
+
+        // given 2 taxation record2 exist now
+        taxation3.setRecordId(RECORD_ID.incrementAndGet()); // assign unique ID like DB would
+        given(dao.getTaxation(tenantId, account.getId(), invoice.getId()))
+                .willReturn(Arrays.asList(taxation, taxation2, taxation3));
+
+        // verify compute is idempotent
         assertEquals(calculator.compute(account, newInvoice, invoice, taxableItems2,
                 subsequentAdjustmentItems2, false, emptyList(), tenantId).size(), 0);
         List<EasyTaxTaxation> taxations6 = dao.getTaxation(tenantId, account.getId(),
