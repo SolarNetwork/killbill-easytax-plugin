@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -65,6 +66,8 @@ import org.killbill.billing.util.api.CustomFieldUserApi;
 import org.killbill.clock.Clock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -88,6 +91,8 @@ public class EasyTaxTaxCalculatorTests {
     private static final BigDecimal TEST_TAX_RATE = new BigDecimal("0.15");
 
     private static final AtomicLong RECORD_ID = new AtomicLong((long) (Math.random() * 1000));
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private Clock clock;
     private DateTime now;
@@ -226,6 +231,43 @@ public class EasyTaxTaxCalculatorTests {
                 "Taxation total tax");
     }
 
+    private String prettyPrintInvoiceItemHeader() {
+        return String.format(" %-8.8s | %8.8s | %6.6s | %8.8s", "Item ID", "Type", "Amount",
+                "Linked") + "\n----------+----------+--------+---------\n";
+    }
+
+    private String prettyPrintInvoiceItem(InvoiceItem item) {
+        return String.format(" %-8.8s | %8.8s | %6.2f | %8.8s", item.getId(),
+                item.getInvoiceItemType(), item.getAmount(),
+                item.getLinkedItemId() != null ? item.getLinkedItemId() : "");
+    }
+
+    private String prettyPrintInvoiceAndComputedTaxItems(Collection<InvoiceItem> taxableItems,
+            Map<UUID, Collection<InvoiceItem>> adjustmentItems, Collection<InvoiceItem> items) {
+        StringBuffer buf = new StringBuffer();
+        buf.append("Taxable items:\n");
+        if (taxableItems != null && !taxableItems.isEmpty()) {
+            buf.append(prettyPrintInvoiceItemHeader());
+            for (InvoiceItem item : taxableItems) {
+                buf.append(prettyPrintInvoiceItem(item)).append('\n');
+            }
+        }
+        if (adjustmentItems != null && !adjustmentItems.isEmpty()) {
+            for (Collection<InvoiceItem> adjItems : adjustmentItems.values()) {
+                for (InvoiceItem item : adjItems) {
+                    buf.append(prettyPrintInvoiceItem(item)).append('\n');
+                }
+            }
+        }
+        buf.append("\nComputed tax items:\n");
+        if (items != null && !items.isEmpty()) {
+            for (InvoiceItem item : items) {
+                buf.append(prettyPrintInvoiceItem(item)).append('\n');
+            }
+        }
+        return buf.toString();
+    }
+
     @Test(groups = "fast")
     public void invoiceItemAdjustmentOnNewInvoice() throws Exception {
         // given
@@ -254,17 +296,26 @@ public class EasyTaxTaxCalculatorTests {
         final List<InvoiceItem> initialTaxItems = calculator.compute(account1, invoice, invoice,
                 taxableItems1, adjustmentItems1, false, emptyList(), tenantId);
 
+        log.info(prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(), adjustmentItems1,
+                initialTaxItems));
+
         // then
-        assertEquals(initialTaxItems.size(), 1);
+        assertEquals(initialTaxItems.size(), 2);
         InvoiceItem taxItem1 = initialTaxItems.get(0);
         assertEquals(taxItem1.getAccountId(), account1.getId());
         assertEquals(taxItem1.getInvoiceId(), invoice.getId());
         assertEquals(taxItem1.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem1.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
-        assertBigDecimalEquals(
-                taxItem1.getAmount(), taxableItem1.getAmount()
-                        .add(adjustment1ForInvoiceItem1.getAmount()).multiply(TEST_TAX_RATE),
-                2, "Tax amount");
+        assertBigDecimalEquals(taxItem1.getAmount(),
+                taxableItem1.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
+
+        InvoiceItem taxItem2 = initialTaxItems.get(1);
+        assertEquals(taxItem2.getAccountId(), account1.getId());
+        assertEquals(taxItem2.getInvoiceId(), invoice.getId());
+        assertEquals(taxItem2.getInvoiceItemType(), InvoiceItemType.TAX);
+        assertEquals(taxItem2.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
+        assertBigDecimalEquals(taxItem2.getAmount(),
+                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
 
         // verify what was stored in the taxation table
         ArgumentCaptor<EasyTaxTaxation> taxationCaptor = ArgumentCaptor
@@ -276,8 +327,8 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(taxation.getKbAccountId(), account1.getId(), "Taxation account1");
         assertEquals(taxation.getKbInvoiceId(), invoice.getId(), "Taxation invoice");
         assertEquals(taxation.getInvoiceItemIds(), Collections.singletonMap(taxableItem1.getId(),
-                Collections.singleton(taxItem1.getId())));
-        assertBigDecimalEquals(taxation.getTotalTax(), taxItem1.getAmount(), 2,
+                new HashSet<>(Arrays.asList(taxItem1.getId(), taxItem2.getId()))));
+        assertBigDecimalEquals(taxation.getTotalTax(), new BigDecimal("14.85"), 2,
                 "Total tax adjusted $100-$1 @ 15%");
     }
 

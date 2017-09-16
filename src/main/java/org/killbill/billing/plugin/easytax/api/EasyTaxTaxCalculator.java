@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
@@ -185,22 +184,6 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
     }
 
     @Override
-    protected void computeNewItemsToTaxAndExistingItemsToAdjust(Map<UUID, InvoiceItem> taxableItems,
-            Map<UUID, Collection<InvoiceItem>> adjustmentItems,
-            Map<UUID, Set<UUID>> alreadyTaxedItemsWithAdjustments,
-            Map<UUID, InvoiceItem> newItemsToTax, Map<UUID, InvoiceItem> existingItemsToAdjust,
-            Map<UUID, Collection<InvoiceItem>> adjustmentItemsForExistingItems) {
-        Map<UUID, InvoiceItem> salesTaxItems = new LinkedHashMap<>();
-        super.computeNewItemsToTaxAndExistingItemsToAdjust(taxableItems, adjustmentItems,
-                alreadyTaxedItemsWithAdjustments, salesTaxItems, existingItemsToAdjust,
-                adjustmentItemsForExistingItems);
-        // filter out returns for the same item here so we generate just the adjusted tax amount
-        newItemsToTax.putAll(salesTaxItems.entrySet().stream()
-                .filter(e -> !existingItemsToAdjust.containsKey(e.getKey()))
-                .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue())));
-    }
-
-    @Override
     public List<InvoiceItem> compute(Account account, Invoice newInvoice, Invoice invoice,
             Map<UUID, InvoiceItem> taxableItems, Map<UUID, Collection<InvoiceItem>> adjustmentItems,
             boolean dryRun, Iterable<PluginProperty> pluginProperties, UUID kbTenantId) {
@@ -211,16 +194,14 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
             return Collections.emptyList();
         }
 
-        Map<UUID, Set<UUID>> alreadyTaxedItemsWithAdjustments = getAlreadyTaxedItemsWithAdjustments(
-                invoice, kbTenantId);
+        Map<UUID, Set<UUID>> alreadyTaxedItems = getAlreadyTaxedItemsWithTaxes(invoice, kbTenantId);
 
         final Map<UUID, InvoiceItem> salesTaxItems = new LinkedHashMap<>();
         final Map<UUID, InvoiceItem> returnTaxItems = new LinkedHashMap<>();
         // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINES
         final Map<UUID, Collection<InvoiceItem>> adjustmentItemsForReturnTaxItems = new LinkedHashMap<>();
         computeNewItemsToTaxAndExistingItemsToAdjust(taxableItems, adjustmentItems,
-                alreadyTaxedItemsWithAdjustments, salesTaxItems, returnTaxItems,
-                adjustmentItemsForReturnTaxItems);
+                alreadyTaxedItems, salesTaxItems, returnTaxItems, adjustmentItemsForReturnTaxItems);
 
         // TODO: make static for actual caching support?
         final Map<String, String> planToProductCache = new HashMap<>();
@@ -280,8 +261,8 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
     }
 
     /**
-     * Get a mapping of existing taxable invoice item IDs to associated tax invoice item adjustments
-     * on an invoice.
+     * Get a mapping of existing taxable invoice item IDs to associated tax invoice items on an
+     * invoice.
      * 
      * @param invoice
      *            the invoice to inspect
@@ -289,8 +270,7 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
      *            the tenant ID
      * @return the mapping, or an empty {@code Map} if no existing items available
      */
-    private Map<UUID, Set<UUID>> getAlreadyTaxedItemsWithAdjustments(Invoice invoice,
-            UUID kbTenantId) {
+    private Map<UUID, Set<UUID>> getAlreadyTaxedItemsWithTaxes(Invoice invoice, UUID kbTenantId) {
         Map<UUID, Set<UUID>> alreadyTaxed = null;
         try {
             List<EasyTaxTaxation> taxations = dao.getTaxation(kbTenantId, invoice.getAccountId(),
@@ -374,7 +354,9 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
         for (final InvoiceItem taxableItem : taxableItems.values()) {
             final Collection<InvoiceItem> adjustmentsForTaxableItem = adjustmentItems == null ? null
                     : adjustmentItems.get(taxableItem.getId());
-            final BigDecimal netItemAmount = netAmount(taxableItem, adjustmentsForTaxableItem);
+            final BigDecimal netItemAmount = adjustmentsForTaxableItem == null
+                    ? taxableItem.getAmount()
+                    : sum(adjustmentsForTaxableItem);
             newTaxItems.addAll(taxInvoiceItemsForInvoiceItem(account, newInvoice, taxableItem,
                     taxZone, netItemAmount, utcToday, kbTenantId, planToProductCache));
         }
