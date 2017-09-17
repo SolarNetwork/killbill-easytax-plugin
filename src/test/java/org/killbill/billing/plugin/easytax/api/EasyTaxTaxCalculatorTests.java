@@ -15,6 +15,7 @@
 
 package org.killbill.billing.plugin.easytax.api;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
@@ -31,7 +32,6 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -86,11 +86,13 @@ import com.google.common.collect.ImmutableMap;
 public class EasyTaxTaxCalculatorTests {
 
     private static final String GST = "GST";
+    private static final String XST = "XST";
 
     private static final String TEST_PRODUCT_NAME = "test-product";
     private static final String TEST_PLAN_NAME = "test-plan";
 
-    private static final BigDecimal TEST_TAX_RATE = new BigDecimal("0.15");
+    private static final BigDecimal GST_RATE = new BigDecimal("0.15");
+    private static final BigDecimal XST_RATE = new BigDecimal("0.385");
 
     private static final AtomicLong RECORD_ID = new AtomicLong((long) (Math.random() * 1000));
 
@@ -106,6 +108,7 @@ public class EasyTaxTaxCalculatorTests {
     private EasyTaxDao dao;
 
     private EasyTaxTaxCode nzGst;
+    private EasyTaxTaxCode xst;
     private Product testProduct;
     private StaticCatalog currCatalog;
 
@@ -144,9 +147,18 @@ public class EasyTaxTaxCalculatorTests {
         taxCode.setTaxZone("NZ");
         taxCode.setProductName(TEST_PRODUCT_NAME);
         taxCode.setTaxCode(GST);
-        taxCode.setTaxRate(TEST_TAX_RATE);
+        taxCode.setTaxRate(GST_RATE);
         taxCode.setValidFromDate(new DateTime().year().roundFloorCopy());
         nzGst = taxCode;
+
+        taxCode = new EasyTaxTaxCode();
+        taxCode.setKbTenantId(tenantId);
+        taxCode.setTaxZone("NZ");
+        taxCode.setProductName(TEST_PRODUCT_NAME);
+        taxCode.setTaxCode(XST);
+        taxCode.setTaxRate(XST_RATE);
+        taxCode.setValidFromDate(new DateTime().year().roundFloorCopy());
+        xst = taxCode;
 
         // add catalog support with test product and test plan
         currCatalog = Mockito.mock(StaticCatalog.class);
@@ -208,8 +220,8 @@ public class EasyTaxTaxCalculatorTests {
         final List<InvoiceItem> initialTaxItems = calculator.compute(account1, newInvoice1, invoice,
                 taxableItems1, adjustmentItems1, false, emptyList(), tenantId);
 
-        log.info(EasyTaxTestUtils.prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(),
-                adjustmentItems1, initialTaxItems));
+        log.info(prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(), adjustmentItems1,
+                initialTaxItems));
 
         // then
         assertEquals(initialTaxItems.size(), 1);
@@ -234,6 +246,66 @@ public class EasyTaxTaxCalculatorTests {
                 Collections.singleton(taxItem1.getId())));
         assertBigDecimalEquals(taxation.getTotalTax(), taxItem1.getAmount(), 2,
                 "Taxation total tax");
+    }
+
+    @Test(groups = "fast")
+    public void invoiceItemOnNewInvoiceMultipleTaxes() throws Exception {
+        // given
+        final PluginTaxCalculator calculator = calculatorWithConfig(config);
+
+        final Invoice invoice = TestUtils.buildInvoice(account1);
+        final DateTime invoiceTaxDate = invoice.getInvoiceDate()
+                .toDateTimeAtStartOfDay(account1.getTimeZone());
+        final InvoiceItem taxableItem1 = invoiceItemForTestPlan(invoice, new BigDecimal("100"));
+        final Map<UUID, InvoiceItem> taxableItems1 = singletonMap(taxableItem1.getId(),
+                taxableItem1);
+        final Map<UUID, Collection<InvoiceItem>> adjustmentItems1 = Collections.emptyMap();
+
+        // query for applicable tax codes will return GST for account
+        given(dao.getTaxCodes(tenantId, account1.getCountry(), TEST_PRODUCT_NAME, null,
+                invoiceTaxDate)).willReturn(asList(nzGst, xst));
+
+        // no taxation records exist yet
+        given(dao.getTaxation(tenantId, account1.getId(), invoice.getId())).willReturn(emptyList());
+
+        // when
+        final List<InvoiceItem> initialTaxItems = calculator.compute(account1, newInvoice1, invoice,
+                taxableItems1, adjustmentItems1, false, emptyList(), tenantId);
+
+        log.info(prettyPrintInvoiceAndComputedTaxItems(taxableItems1.values(), adjustmentItems1,
+                initialTaxItems));
+
+        // then
+        assertEquals(initialTaxItems.size(), 2);
+        InvoiceItem taxItem1 = initialTaxItems.get(0);
+        assertEquals(taxItem1.getAccountId(), account1.getId());
+        assertEquals(taxItem1.getInvoiceId(), newInvoice1.getId());
+        assertEquals(taxItem1.getInvoiceItemType(), InvoiceItemType.TAX);
+        assertBigDecimalEquals(taxItem1.getAmount(),
+                taxableItem1.getAmount().multiply(nzGst.getTaxRate()), 2, "Tax amount");
+        assertEquals(taxItem1.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
+
+        InvoiceItem taxItem2 = initialTaxItems.get(1);
+        assertEquals(taxItem2.getAccountId(), account1.getId());
+        assertEquals(taxItem2.getInvoiceId(), newInvoice1.getId());
+        assertEquals(taxItem2.getInvoiceItemType(), InvoiceItemType.TAX);
+        assertBigDecimalEquals(taxItem2.getAmount(),
+                taxableItem1.getAmount().multiply(xst.getTaxRate()), 2, "Tax amount");
+        assertEquals(taxItem2.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
+
+        // verify what was stored in the taxation table
+        ArgumentCaptor<EasyTaxTaxation> taxationCaptor = ArgumentCaptor
+                .forClass(EasyTaxTaxation.class);
+        then(dao).should().addTaxation(taxationCaptor.capture());
+
+        EasyTaxTaxation taxation = taxationCaptor.getValue();
+        assertEquals(taxation.getKbTenantId(), tenantId, "Taxation tenant");
+        assertEquals(taxation.getKbAccountId(), account1.getId(), "Taxation account1");
+        assertEquals(taxation.getKbInvoiceId(), invoice.getId(), "Taxation invoice");
+        assertEquals(taxation.getInvoiceItemIds(), Collections.singletonMap(taxableItem1.getId(),
+                new HashSet<>(asList(taxItem1.getId(), taxItem2.getId()))));
+        assertBigDecimalEquals(taxation.getTotalTax(),
+                taxItem1.getAmount().add(taxItem2.getAmount()), 2, "Taxation total tax");
     }
 
     @Test(groups = "fast")
@@ -274,8 +346,8 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(taxItem1.getInvoiceId(), invoice.getId());
         assertEquals(taxItem1.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem1.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
-        assertBigDecimalEquals(taxItem1.getAmount(),
-                taxableItem1.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
+        assertBigDecimalEquals(taxItem1.getAmount(), taxableItem1.getAmount().multiply(GST_RATE), 2,
+                "Tax amount");
 
         InvoiceItem taxItem2 = initialTaxItems.get(1);
         assertEquals(taxItem2.getAccountId(), account1.getId());
@@ -283,7 +355,7 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(taxItem2.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem2.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
         assertBigDecimalEquals(taxItem2.getAmount(),
-                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
+                adjustment1ForInvoiceItem1.getAmount().multiply(GST_RATE), 2, "Tax amount");
 
         // verify what was stored in the taxation table
         ArgumentCaptor<EasyTaxTaxation> taxationCaptor = ArgumentCaptor
@@ -296,7 +368,7 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(taxation.getKbInvoiceId(), invoice.getId(), "Taxation invoice");
         assertEquals(taxation.getInvoiceItemIds(),
                 Collections.singletonMap(taxableItem1.getId(),
-                        new HashSet<>(Arrays.asList(taxItem1.getId(), taxItem2.getId(),
+                        new HashSet<>(asList(taxItem1.getId(), taxItem2.getId(),
                                 adjustment1ForInvoiceItem1.getId()))));
         assertBigDecimalEquals(taxation.getTotalTax(), new BigDecimal("14.85"), 2,
                 "Total tax adjusted $100-$1 @ 15%");
@@ -362,16 +434,16 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(taxItem1.getInvoiceId(), newInvoice.getId());
         assertEquals(taxItem1.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem1.getLinkedItemId(), taxableItem1.getId(), "Linked to taxable item");
-        assertBigDecimalEquals(taxItem1.getAmount(),
-                taxableItem1.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
+        assertBigDecimalEquals(taxItem1.getAmount(), taxableItem1.getAmount().multiply(GST_RATE), 2,
+                "Tax amount");
 
         InvoiceItem taxItem2 = initialTaxItems.get(1);
         assertEquals(taxItem2.getAccountId(), account.getId());
         assertEquals(taxItem2.getInvoiceId(), newInvoice.getId());
         assertEquals(taxItem2.getInvoiceItemType(), InvoiceItemType.TAX);
         assertEquals(taxItem2.getLinkedItemId(), taxableItem2.getId(), "Linked to taxable item");
-        assertBigDecimalEquals(taxItem2.getAmount(),
-                taxableItem2.getAmount().multiply(TEST_TAX_RATE), 2, "Tax amount");
+        assertBigDecimalEquals(taxItem2.getAmount(), taxableItem2.getAmount().multiply(GST_RATE), 2,
+                "Tax amount");
 
         EasyTaxTaxation taxation = taxationCaptor.getValue();
         assertEquals(taxation.getKbTenantId(), tenantId, "Taxation tenant");
@@ -383,7 +455,7 @@ public class EasyTaxTaxCalculatorTests {
                         singleton(initialTaxItems.get(1).getId())),
                 "Invoice item IDs for all taxable items");
         assertBigDecimalEquals(taxation.getTotalTax(),
-                taxableItem1.getAmount().add(taxableItem2.getAmount()).multiply(TEST_TAX_RATE), 2,
+                taxableItem1.getAmount().add(taxableItem2.getAmount()).multiply(GST_RATE), 2,
                 "Total tax adjusted $100+$10 @ 15%");
 
         // given 1 taxation record exists now
@@ -420,7 +492,7 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(adjustments1.get(0).getLinkedItemId(), taxableItem1.getId(),
                 "Linked to taxable item");
         assertBigDecimalEquals(adjustments1.get(0).getAmount(),
-                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2,
+                adjustment1ForInvoiceItem1.getAmount().multiply(GST_RATE), 2,
                 "Tax amount for -$1 adjustment");
 
         assertEquals(taxationCaptor.getAllValues().size(), 2, "Taxation record added");
@@ -428,19 +500,18 @@ public class EasyTaxTaxCalculatorTests {
         assertEquals(taxation2.getKbTenantId(), tenantId, "Taxation tenant");
         assertEquals(taxation2.getKbAccountId(), account.getId(), "Taxation account");
         assertEquals(taxation2.getKbInvoiceId(), invoice.getId(), "Taxation invoice");
-        assertEquals(taxation2.getInvoiceItemIds(),
-                ImmutableMap.of(taxableItem1.getId(),
-                        new HashSet<>(Arrays.asList(adjustments1.get(0).getId(),
-                                adjustment1ForInvoiceItem1.getId()))),
+        assertEquals(taxation2.getInvoiceItemIds(), ImmutableMap.of(taxableItem1.getId(),
+                new HashSet<>(
+                        asList(adjustments1.get(0).getId(), adjustment1ForInvoiceItem1.getId()))),
                 "Taxaction records new tax and adjustment references");
         assertBigDecimalEquals(taxation2.getTotalTax(),
-                adjustment1ForInvoiceItem1.getAmount().multiply(TEST_TAX_RATE), 2,
+                adjustment1ForInvoiceItem1.getAmount().multiply(GST_RATE), 2,
                 "Total tax for $1 adjustment");
 
         // given 2 taxation records exist now
         taxation2.setRecordId(RECORD_ID.incrementAndGet()); // assign unique ID like DB would
         given(dao.getTaxation(tenantId, account.getId(), invoice.getId()))
-                .willReturn(Arrays.asList(taxation, taxation2));
+                .willReturn(asList(taxation, taxation2));
 
         // verify compute is idempotent
         final List<InvoiceItem> adjustments1idemp = calculator.compute(account, newInvoice, invoice,
@@ -493,7 +564,7 @@ public class EasyTaxTaxCalculatorTests {
         // given 3 taxation records exist now (2 for invoice, 1 for adjustmentInvoice)
         taxation3.setRecordId(RECORD_ID.incrementAndGet()); // assign unique ID like DB would
         given(dao.getTaxation(tenantId, account.getId(), adjustmentInvoice.getId()))
-                .willReturn(Arrays.asList(taxation3));
+                .willReturn(asList(taxation3));
 
         // verify compute is idempotent
         final List<InvoiceItem> adjustments2idemp = calculator.compute(account, newInvoice,
