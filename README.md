@@ -320,7 +320,7 @@ Releasing
 A command like the following is used to release the plugin:
 
 ```
-mvn -Pjdk18 release:perform -DreleaseProfiles=jdk18 -Darguments=-Dgpg.keyname=4BC94956
+mvn -Pjdk18 release:prepare -DreleaseProfiles=jdk18 -Darguments=-Dgpg.keyname=4BC94956
 ```
 
 The GPG key used for signing is available on the [MIT public server][keyserver].
