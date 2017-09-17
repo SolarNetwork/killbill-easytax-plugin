@@ -314,5 +314,17 @@ the `simpleTaxDateResolver.defaultTimeZone` below).
  * `simpleTaxDateResolver.fallBackToInvoiceCreatedDate`: boolean flag to allow falling
    back to using the invoice creation date if the date mode rules don't resolve a date
 
- [RoundingMode]: https://docs.oracle.com/javase/8/docs/api/java/math/RoundingMode.html
+Releasing
+---------
 
+A command like the following is used to release the plugin:
+
+```
+mvn -Pjdk18 release:perform -DreleaseProfiles=jdk18 -Darguments=-Dgpg.keyname=4BC94956
+```
+
+The GPG key used for signing is available on the [MIT public server][keyserver].
+
+
+ [RoundingMode]: https://docs.oracle.com/javase/8/docs/api/java/math/RoundingMode.html
+ [keyserver]: https://pgp.mit.edu/pks/lookup?search=%40solarnetwork.net&op=index
