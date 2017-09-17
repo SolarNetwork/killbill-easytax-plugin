@@ -222,7 +222,7 @@ public class EasyTaxServlet extends PluginServlet {
      * 
      * <p>
      * If the path does not match a specific tax code then the request body is expected to contain
-     * an array of {@link EasyTaxCode} objects that contain all details other than
+     * an array of {@link EasyTaxTaxCode} objects that contain all details other than
      * <b>created_date</b> and <b>tenant_id</b>, which will be populated automatically.
      * </p>
      * 

@@ -43,11 +43,10 @@ public class BigDecimalStringSerializer extends StdSerializer<BigDecimal> {
 
     /**
      * Default constructor.
+     * 
      * <p>
      * Note: usually you should NOT create new instances, but instead use {@link #INSTANCE} which is
-     * stateless and fully thread-safe. However, there are cases where constructor is needed; for
-     * example, when using explicit serializer annotations like
-     * {@link com.fasterxml.jackson.databind.annotation.JsonSerialize#using}.
+     * stateless and fully thread-safe.
      * </p>
      */
     public BigDecimalStringSerializer() {
