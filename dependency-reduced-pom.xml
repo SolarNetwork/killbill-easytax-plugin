@@ -9,7 +9,7 @@
     </parent>
     <groupId>net.solarnetwork.billing</groupId>
     <artifactId>easytax-plugin</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <packaging>bundle</packaging>
     <name>Kill Bill OSGI EasyTax plugin</name>
     <description>Kill Bill EasyTax plugin</description>
@@ -290,6 +290,30 @@
                 </configuration>
             </plugin>
             <plugin>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.6</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <keyname>${gpg.keyname}</keyname>
+                            <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.9</version>
+                <configuration>
+                    <excludePackageNames>org.killbill.billing.plugin.easytax.dao.gen.*</excludePackageNames>
+                </configuration>
+            </plugin>
+            <plugin>
                 <artifactId>maven-shade-plugin</artifactId>
                 <executions>
                     <execution>
@@ -313,4 +337,18 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>jdk16</id>
+        </profile>
+        <profile>
+            <id>jdk18</id>
+        </profile>
+        <profile>
+            <id>disable-java8-doclint</id>
+            <properties>
+                <additionalparam>-Xdoclint:none</additionalparam>
+            </properties>
+        </profile>
+    </profiles>
 </project>
