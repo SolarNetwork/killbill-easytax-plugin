@@ -21,13 +21,13 @@
         <groupId>org.kill-bill.billing</groupId>
         <version>0.140.2</version>
     </parent>
-    <groupId>org.kill-bill.billing.plugin.java</groupId>
+    <groupId>net.solarnetwork.billing</groupId>
     <artifactId>easytax-plugin</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>Kill Bill OSGI EasyTax plugin</name>
     <description>Kill Bill EasyTax plugin</description>
-    <url>http://github.com/killbill/killbill-easytax-plugin</url>
+    <url>http://github.com/SolarNetwork/killbill-easytax-plugin</url>
     <scm>
         <connection>scm:git:git://github.com/SolarNetwork/killbill-easytax-plugin.git</connection>
         <developerConnection>scm:git:git@github.com:SolarNetwork/killbill-easytax-plugin.git</developerConnection>
@@ -37,6 +37,13 @@
         <system>Github</system>
         <url>https://github.com/SolarNetwork/killbill-easytax-plugin/issues</url>
     </issueManagement>
+    <distributionManagement>
+        <repository>
+            <id>bintray-solarnetwork-SolarNetwork</id>
+            <name>solarnetwork-SolarNetwork</name>
+            <url>https://api.bintray.com/maven/solarnetwork/SolarNetwork/killbill-easytax-plugin/;publish=0</url>
+        </repository>
+	</distributionManagement>
     <dependencies>
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
