@@ -371,6 +371,18 @@
                     </includes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <configuration>
+                	<includes>
+                		<include>src/main/java/**</include>
+                	</includes>
+                    <excludes>
+                        <exclude>src/main/java/org/killbill/billing/plugin/easytax/dao/gen/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
         <pluginManagement>
             <plugins>
@@ -396,17 +408,6 @@
                                 </pluginExecution>
                             </pluginExecutions>
                         </lifecycleMappingMetadata>
-                    </configuration>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.rat</groupId>
-                    <artifactId>apache-rat-plugin</artifactId>
-                    <configuration>
-                        <excludes>
-                            <exclude>.*</exclude>
-                            <exclude>src/main/java/org/killbill/billing/plugin/easytax/dao/gen/**</exclude>
-                            <exclude>src/test/resources/**/*.json</exclude>
-                        </excludes>
                     </configuration>
                 </plugin>
             </plugins>
