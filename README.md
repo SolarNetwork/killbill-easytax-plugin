@@ -1,7 +1,7 @@
 EasyTax plugin
 ==============
 
-Kill Bill tax plugin for simple region bases tax systems. It works by allowing tax rates to be
+Kill Bill tax plugin for simple region based tax systems. It works by allowing tax rates to be
 defined at the following granularity:
 
  * a **tax zone** that represents a region or group of tax rules, for example a country code like `NZ`
