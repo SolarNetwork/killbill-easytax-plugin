@@ -38,7 +38,6 @@ public class BigDecimalStringSerializer extends StdSerializer<BigDecimal> {
     /**
      * Singleton instance to use.
      */
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
     public static final BigDecimalStringSerializer INSTANCE = new BigDecimalStringSerializer();
 
     /**

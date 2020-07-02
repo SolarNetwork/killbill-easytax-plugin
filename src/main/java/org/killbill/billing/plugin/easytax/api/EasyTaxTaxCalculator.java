@@ -60,15 +60,17 @@ import org.slf4j.LoggerFactory;
  * loaded in the database.
  * 
  * @author matt
+ * @version 2
  */
 public class EasyTaxTaxCalculator extends PluginTaxCalculator {
 
     /** The service filter property key for the tenant ID. */
     public static final String TENANT_ID_FILTER = "tenant";
 
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 2 LINES
+    // CHECKSTYLE OFF: LineLength
     private static final ConcurrentMap<UUID, EasyTaxTaxZoneResolver> ZONE_RESOLVER_CACHE = new ConcurrentHashMap<>();
     private static final ConcurrentMap<UUID, EasyTaxTaxDateResolver> DATE_RESOLVER_CACHE = new ConcurrentHashMap<>();
+    // CHECKSTYLE ON: LineLength
 
     private final OSGIKillbill killbillApi;
     private final EasyTaxConfigurationHandler configurationHandler;
@@ -199,11 +201,11 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
 
         final Map<UUID, InvoiceItem> salesTaxItems = new LinkedHashMap<>();
         final Map<UUID, InvoiceItem> returnTaxItems = new LinkedHashMap<>();
-        // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINES
+        // CHECKSTYLE OFF: LineLength
         final Map<UUID, Collection<InvoiceItem>> adjustmentItemsForReturnTaxItems = new LinkedHashMap<>();
         computeNewItemsToTaxAndExistingItemsToAdjust(taxableItems, adjustmentItems,
                 alreadyTaxedItems, salesTaxItems, returnTaxItems, adjustmentItemsForReturnTaxItems);
-
+        // CHECKSTYLE ON: LineLength
         // TODO: make static for actual caching support?
         final Map<String, String> planToProductCache = new HashMap<>();
 
@@ -343,7 +345,7 @@ public class EasyTaxTaxCalculator extends PluginTaxCalculator {
             try {
                 StaticCatalog catalog = killbillApi.getCatalogUserApi().getCurrentCatalog(null,
                         new EasyTaxTenantContext(kbTenantId, invoiceItem.getAccountId()));
-                Plan plan = catalog.findCurrentPlan(planName);
+                Plan plan = catalog.findPlan(planName);
                 return (plan != null && plan.getProduct() != null ? plan.getProduct().getName()
                         : null);
             } catch (CatalogApiException e) {

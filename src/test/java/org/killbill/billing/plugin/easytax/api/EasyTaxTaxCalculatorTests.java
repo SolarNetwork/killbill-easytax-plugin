@@ -166,7 +166,7 @@ public class EasyTaxTaxCalculatorTests {
         given(testProduct.getName()).willReturn(TEST_PRODUCT_NAME);
         Plan plan = Mockito.mock(Plan.class);
         given(plan.getProduct()).willReturn(testProduct);
-        given(currCatalog.findCurrentPlan(TEST_PLAN_NAME)).willReturn(plan);
+        given(currCatalog.findPlan(TEST_PLAN_NAME)).willReturn(plan);
         CatalogUtils.setupCatalogApi(osgiKillbillApi, CatalogUtils.createCatalogApi(currCatalog));
     }
 

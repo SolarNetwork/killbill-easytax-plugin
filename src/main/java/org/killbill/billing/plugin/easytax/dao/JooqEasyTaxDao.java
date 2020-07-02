@@ -51,11 +51,18 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 
+/**
+ * Jooq implementation of {@link EasyTaxDao}.
+ * 
+ * @author matt
+ * @version 2
+ */
 public class JooqEasyTaxDao extends PluginDao implements EasyTaxDao {
 
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
+    // CHECKSTYLE OFF: LineLength
     private static final TypeReference<Map<UUID, Set<UUID>>> INVOICE_ITEM_ID_TAX_MAPPING_TYPE = new TypeReference<Map<UUID, Set<UUID>>>() {
     };
+    // CHECKSTYLE ON: LineLength
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 

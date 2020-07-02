@@ -1,8 +1,10 @@
-/*! SET storage_engine=INNODB */;
+/*! SET default_storage_engine=INNODB */;
 
 /* NOTE record_id serial primary key suffers from MySQL bug
  * https://bugs.mysql.com/bug.php?id=37130
  */
+
+SELECT @@global.time_zone, @@session.time_zone;
 
 drop table if exists easytax_taxations;
 create table easytax_taxations (

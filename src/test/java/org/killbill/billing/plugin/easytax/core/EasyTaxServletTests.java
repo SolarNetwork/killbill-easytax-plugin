@@ -19,6 +19,8 @@ import static java.util.Collections.singleton;
 import static org.killbill.billing.plugin.easytax.EasyTaxTestUtils.assertDateTimeEquals;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -47,15 +49,20 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.killbill.billing.ErrorCode;
 import org.killbill.billing.plugin.easytax.api.EasyTaxDao;
+import org.killbill.billing.security.Logical;
 import org.killbill.billing.security.Permission;
+import org.killbill.billing.security.SecurityApiException;
 import org.killbill.billing.security.api.SecurityApi;
 import org.killbill.billing.tenant.api.Tenant;
 import org.killbill.billing.util.callcontext.TenantContext;
 import org.killbill.clock.Clock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
-import org.mockito.Matchers;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -107,16 +114,32 @@ public class EasyTaxServletTests {
             throw new RuntimeException(e);
         }
         given(securityApi.isSubjectAuthenticated()).willReturn(true);
-        given(securityApi
-                .getCurrentUserPermissions(Matchers.argThat(new ArgumentMatcher<TenantContext>() {
-
-                    @Override
-                    public boolean matches(Object arg) {
-                        return (arg instanceof TenantContext
-                                && tenantId.equals(((TenantContext) arg).getTenantId()));
+        try {
+            willAnswer(new Answer<Void>() {
+                @Override
+                public Void answer(InvocationOnMock invocation) throws Throwable {
+                    List<Permission> list = invocation.getArgumentAt(0, List.class);
+                    // assume AND here
+                    for (Permission p : permissions) {
+                        if (list.contains(p)) {
+                            return null;
+                        }
                     }
+                    throw new SecurityApiException(ErrorCode.SECURITY_NOT_ENOUGH_PERMISSIONS);
+                }
+            }).given(securityApi).checkCurrentUserPermissions(Mockito.anyList(),
+                    Mockito.eq(Logical.AND), argThat(new ArgumentMatcher<TenantContext>() {
 
-                }))).willReturn(permissions);
+                        @Override
+                        public boolean matches(Object arg) {
+                            return (arg instanceof TenantContext
+                                    && tenantId.equals(((TenantContext) arg).getTenantId()));
+                        }
+
+                    }));
+        } catch (SecurityException | SecurityApiException e) {
+            // ignore
+        }
     }
 
     private void thenAuthenticatedAs(String username, String password) {
@@ -488,7 +511,7 @@ public class EasyTaxServletTests {
     public void deleteAllTaxCodesNotPermitted() throws IOException, ServletException, SQLException {
         // given
         ByteArrayOutputStream byos = givenDefaultServletCall("DELETE", "/taxCodes");
-        givenPermissions(TEST_USER, TEST_PASSWORD, singleton(Permission.USER_CAN_VIEW));
+        givenPermissions(TEST_USER, TEST_PASSWORD, singleton(Permission.USER_CAN_CREATE));
         given(dao.removeTaxCodes(tenantId, null, null, null)).willReturn(1);
 
         // when
@@ -630,7 +653,7 @@ public class EasyTaxServletTests {
         ByteArrayInputStream byis = new ByteArrayInputStream(data);
         ByteArrayOutputStream byos = givenDefaultServletCall("POST", "/taxCodes/NZ/memory-use/GST",
                 byis, data.length, EasyTaxServlet.APPLICATION_JSON_UTF8);
-        givenPermissions(TEST_USER, TEST_PASSWORD, singleton(Permission.USER_CAN_VIEW));
+        givenPermissions(TEST_USER, TEST_PASSWORD, singleton(Permission.USER_CAN_CREATE));
 
         // when
         servlet.service(req, res);

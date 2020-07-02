@@ -55,8 +55,9 @@ public class SimpleTaxDateResolver implements EasyTaxTaxDateResolver {
      * The property value is expected to be {@literal true} or {@literal false}.
      * </p>
      */
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
+    // CHECKSTYLE OFF: LineLength
     public static final String FALLBACK_TO_INVOICE_DATE_PROPERTY = "simpleTaxDateResolver.fallBackToInvoiceDate";
+    // CHECKSTYLE ON: LineLength
 
     /**
      * The configuration property key for the flag to fall back to the invoice item created date if
@@ -66,8 +67,9 @@ public class SimpleTaxDateResolver implements EasyTaxTaxDateResolver {
      * The property value is expected to be {@literal true} or {@literal false}.
      * </p>
      */
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
+    // CHECKSTYLE OFF: LineLength
     public static final String FALLBACK_TO_INVOICE_ITEM_CREATED_DATE_PROPERTY = "simpleTaxDateResolver.fallBackToInvoiceItemCreatedDate";
+    // CHECKSTYLE ON: LineLength
 
     /**
      * The configuration property key for the flag to fall back to the invoice created date if
@@ -77,8 +79,9 @@ public class SimpleTaxDateResolver implements EasyTaxTaxDateResolver {
      * The property value is expected to be {@literal true} or {@literal false}.
      * </p>
      */
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
+    // CHECKSTYLE OFF: LineLength
     public static final String FALLBACK_TO_INVOICE_CREATED_DATE_PROPERTY = "simpleTaxDateResolver.fallBackToInvoiceCreatedDate";
+    // CHECKSTYLE ON: LineLength
 
     /**
      * The configuration property key for the time zone ID to use if the account does not have one.

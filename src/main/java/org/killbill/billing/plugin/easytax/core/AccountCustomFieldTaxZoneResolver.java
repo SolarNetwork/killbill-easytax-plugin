@@ -35,8 +35,9 @@ import org.killbill.billing.util.callcontext.TenantContext;
 public class AccountCustomFieldTaxZoneResolver implements EasyTaxTaxZoneResolver {
 
     /** The configuration property for a boolean flag to use the account country. */
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
+    // CHECKSTYLE OFF: LineLength
     public static final String USE_ACCOUNT_COUNTRY_PROPERTY = "accountCustomFieldTaxZoneResolver.useAccountCountry";
+    // CHECKSTYLE ON: LineLength
 
     /** A custom field name that specifies the tax zone to apply. */
     public static final String TAX_ZONE_CUSTOM_FIIELD = "taxCode";

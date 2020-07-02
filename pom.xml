@@ -19,7 +19,7 @@
     <parent>
         <artifactId>killbill-oss-parent</artifactId>
         <groupId>org.kill-bill.billing</groupId>
-        <version>0.140.2</version>
+        <version>0.143.60</version>
     </parent>
     <groupId>net.solarnetwork.billing</groupId>
     <artifactId>easytax-plugin</artifactId>
@@ -136,18 +136,28 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.kill-bill.billing</groupId>
+            <artifactId>killbill-platform-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>command</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>testing-mysql-server</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>units</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-mxj</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-mxj-db-files</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -309,12 +319,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>3.1.1</version>
                 <dependencies>
                     <dependency>
                         <groupId>com.puppycrawl.tools</groupId>
                         <artifactId>checkstyle</artifactId>
-                        <version>8.19</version>
+                        <version>8.32</version>
                     </dependency>
                 </dependencies>
                 <configuration>

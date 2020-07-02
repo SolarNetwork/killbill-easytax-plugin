@@ -18,9 +18,11 @@ package org.killbill.billing.plugin.easytax.core;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
@@ -40,6 +42,7 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.killbill.billing.plugin.core.PluginServlet;
 import org.killbill.billing.plugin.easytax.api.EasyTaxDao;
 import org.killbill.billing.plugin.easytax.api.EasyTaxTenantContext;
+import org.killbill.billing.security.Logical;
 import org.killbill.billing.security.Permission;
 import org.killbill.billing.security.api.SecurityApi;
 import org.killbill.billing.tenant.api.Tenant;
@@ -55,6 +58,12 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.joda.JodaModule;
 
+/**
+ * Servlet to provide REST API for EasyTax management features.
+ * 
+ * @author matt
+ * @version 2
+ */
 public class EasyTaxServlet extends PluginServlet {
 
     private static final long serialVersionUID = 6708142031245973366L;
@@ -87,9 +96,10 @@ public class EasyTaxServlet extends PluginServlet {
         return objectMapper;
     }
 
-    // CHECKSTYLE IGNORE LineLength FOR NEXT 1 LINE
+    // CHECKSTYLE OFF: LineLength
     private static final TypeReference<List<EasyTaxTaxCode>> TAX_CODE_LIST_MAPPING_TYPE = new TypeReference<List<EasyTaxTaxCode>>() {
     };
+    // CHECKSTYLE ON: LineLength
 
     /**
      * Regexp for tax code URLs like {@literal /taxCodes/{taxZone}/{productName}/{taxCode}}.
@@ -103,8 +113,8 @@ public class EasyTaxServlet extends PluginServlet {
     private final Clock clock;
     private final SecurityApi securityApi;
 
-    private Set<Permission> requiredModifyPermissions = Collections
-            .singleton(Permission.CATALOG_CAN_UPLOAD);
+    private List<Permission> requiredModifyPermissions = Arrays
+            .asList(Permission.CATALOG_CAN_UPLOAD);
 
     /**
      * Constructor.
@@ -401,7 +411,7 @@ public class EasyTaxServlet extends PluginServlet {
         buildOKResponse(null, resp);
     }
 
-    private boolean notAllowed(Tenant tenant, Set<Permission> required, HttpServletRequest req,
+    private boolean notAllowed(Tenant tenant, List<Permission> required, HttpServletRequest req,
             HttpServletResponse resp) throws IOException {
         int result = checkPermission(tenant, required, req);
         if (result != 0) {
@@ -411,7 +421,7 @@ public class EasyTaxServlet extends PluginServlet {
         return false;
     }
 
-    private int checkPermission(Tenant tenant, Set<Permission> required, HttpServletRequest req) {
+    private int checkPermission(Tenant tenant, List<Permission> required, HttpServletRequest req) {
         if (required.isEmpty()) {
             return 0;
         }
@@ -435,13 +445,8 @@ public class EasyTaxServlet extends PluginServlet {
 
             securityApi.login(credentialComponents[0], credentialComponents[1]);
             TenantContext context = new EasyTaxTenantContext(tenant.getId(), null);
-            Set<Permission> granted = securityApi.getCurrentUserPermissions(context);
-            if (granted == null) {
-                return 403;
-            }
-            if (granted.containsAll(required)) {
-                return 0;
-            }
+            securityApi.checkCurrentUserPermissions(required, Logical.AND, context);
+            return 0;
         } catch (Exception e) {
             // ignore and deny
             log.info("Permission check failed for Authorization header {}: {}", authHeader,
@@ -456,7 +461,11 @@ public class EasyTaxServlet extends PluginServlet {
      * @return the set of permissions (never {@literal null})
      */
     public Set<Permission> getRequiredModifyPermissions() {
-        return requiredModifyPermissions;
+        Set<Permission> set = null;
+        if (requiredModifyPermissions != null) {
+            set = new LinkedHashSet<>(requiredModifyPermissions);
+        }
+        return set;
     }
 
     /**
@@ -470,13 +479,13 @@ public class EasyTaxServlet extends PluginServlet {
      *            the set of permissions to require
      */
     public void setRequiredModifyPermissions(@Nonnull Set<Permission> requiredModifyPermissions) {
+        List<Permission> list;
         if (requiredModifyPermissions == null) {
-            requiredModifyPermissions = Collections.emptySet();
+            list = Collections.emptyList();
         } else {
-            requiredModifyPermissions = Collections
-                    .unmodifiableSet(new HashSet<>(requiredModifyPermissions));
+            list = Collections.unmodifiableList(new ArrayList<>(requiredModifyPermissions));
         }
-        this.requiredModifyPermissions = requiredModifyPermissions;
+        this.requiredModifyPermissions = list;
     }
 
 }

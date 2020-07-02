@@ -32,12 +32,14 @@ import org.jooq.BindingSQLContext;
 import org.jooq.BindingSetSQLOutputContext;
 import org.jooq.BindingSetStatementContext;
 import org.jooq.Converter;
+import org.jooq.conf.ParamType;
 import org.jooq.impl.DSL;
 
 /**
  * Converter so that all time stamp values are stored in the UTC time zone.
  * 
  * @author matt
+ * @version 2
  */
 public class JodaDateTimeBinding implements Binding<Timestamp, DateTime> {
 
@@ -85,7 +87,11 @@ public class JodaDateTimeBinding implements Binding<Timestamp, DateTime> {
 
     @Override
     public void sql(BindingSQLContext<DateTime> ctx) throws SQLException {
-        ctx.render().visit(DSL.val(ctx.convert(converter()).value(), Timestamp.class));
+        if (ctx.render().paramType() == ParamType.INLINED) {
+            ctx.render().visit(DSL.inline(ctx.convert(converter()).value()));
+        } else {
+            ctx.render().sql("?");
+        }
     }
 
     @Override
@@ -95,8 +101,8 @@ public class JodaDateTimeBinding implements Binding<Timestamp, DateTime> {
 
     @Override
     public void set(BindingSetStatementContext<DateTime> ctx) throws SQLException {
-        ctx.statement().setTimestamp(ctx.index(), ctx.convert(converter()).value(),
-                Calendar.getInstance(UTC));
+        Timestamp ts = ctx.convert(converter()).value();
+        ctx.statement().setTimestamp(ctx.index(), ts, Calendar.getInstance(UTC));
     }
 
     @Override
@@ -106,14 +112,14 @@ public class JodaDateTimeBinding implements Binding<Timestamp, DateTime> {
 
     @Override
     public void get(BindingGetResultSetContext<DateTime> ctx) throws SQLException {
-        ctx.convert(converter())
-                .value(ctx.resultSet().getTimestamp(ctx.index(), Calendar.getInstance(UTC)));
+        Timestamp ts = ctx.resultSet().getTimestamp(ctx.index(), Calendar.getInstance(UTC));
+        ctx.convert(converter()).value(ts);
     }
 
     @Override
     public void get(BindingGetStatementContext<DateTime> ctx) throws SQLException {
-        ctx.convert(converter())
-                .value(ctx.statement().getTimestamp(ctx.index(), Calendar.getInstance(UTC)));
+        Timestamp ts = ctx.statement().getTimestamp(ctx.index(), Calendar.getInstance(UTC));
+        ctx.convert(converter()).value(ts);
     }
 
     @Override
