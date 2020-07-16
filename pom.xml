@@ -327,6 +327,7 @@
                     </dependency>
                 </dependencies>
                 <configuration>
+                	<propertyExpansion>config_loc=${basedir}/config/checkstyle</propertyExpansion>
                     <configLocation>config/checkstyle/checkstyle.xml</configLocation>
                     <suppressionsLocation>config/checkstyle/suppressions.xml</suppressionsLocation>
                     <encoding>UTF-8</encoding>
