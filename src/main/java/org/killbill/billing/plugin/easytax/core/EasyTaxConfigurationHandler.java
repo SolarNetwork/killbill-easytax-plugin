@@ -21,6 +21,12 @@ import org.killbill.billing.osgi.libs.killbill.OSGIKillbillAPI;
 import org.killbill.billing.osgi.libs.killbill.OSGIKillbillLogService;
 import org.killbill.billing.plugin.api.notification.PluginTenantConfigurableConfigurationHandler;
 
+/**
+ * Plugin configuration handler.
+ * 
+ * @author matt
+ */
+@SuppressWarnings("deprecation")
 public class EasyTaxConfigurationHandler
         extends PluginTenantConfigurableConfigurationHandler<EasyTaxConfig> {
 

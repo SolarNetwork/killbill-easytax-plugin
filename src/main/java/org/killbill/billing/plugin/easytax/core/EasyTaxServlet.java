@@ -84,6 +84,7 @@ public class EasyTaxServlet extends PluginServlet {
     private static final ObjectMapper JSON_MAPPER = defaultObjectMapper();
 
     private static ObjectMapper defaultObjectMapper() {
+        @SuppressWarnings("deprecation")
         ObjectMapper objectMapper = new ObjectMapper().setSerializationInclusion(Include.NON_NULL)
                 .registerModule(new JodaModule())
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)

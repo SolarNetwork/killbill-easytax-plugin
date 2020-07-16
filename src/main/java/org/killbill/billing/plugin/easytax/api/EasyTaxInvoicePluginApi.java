@@ -28,6 +28,12 @@ import org.killbill.billing.plugin.easytax.core.EasyTaxConfigurationHandler;
 import org.killbill.billing.util.callcontext.CallContext;
 import org.killbill.clock.Clock;
 
+/**
+ * Main plugin entry point.
+ * 
+ * @author matt
+ */
+@SuppressWarnings("deprecation")
 public class EasyTaxInvoicePluginApi extends PluginInvoicePluginApi {
 
     private final EasyTaxTaxCalculator calculator;

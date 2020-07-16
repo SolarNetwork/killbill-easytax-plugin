@@ -54,7 +54,6 @@ import org.killbill.billing.invoice.api.Invoice;
 import org.killbill.billing.invoice.api.InvoiceItem;
 import org.killbill.billing.invoice.api.InvoiceItemType;
 import org.killbill.billing.osgi.libs.killbill.OSGIKillbillAPI;
-import org.killbill.billing.osgi.libs.killbill.OSGIKillbillLogService;
 import org.killbill.billing.plugin.TestUtils;
 import org.killbill.billing.plugin.api.invoice.PluginTaxCalculator;
 import org.killbill.billing.plugin.easytax.CatalogUtils;
@@ -113,7 +112,8 @@ public class EasyTaxTaxCalculatorTests {
     private StaticCatalog currCatalog;
 
     private OSGIKillbillAPI osgiKillbillApi;
-    private OSGIKillbillLogService osgiKillbillLogService;
+    @SuppressWarnings("deprecation")
+    private org.killbill.billing.osgi.libs.killbill.OSGIKillbillLogService osgiKillbillLogService;
     private EasyTaxConfig config = new EasyTaxConfig(new Properties());
 
     @BeforeMethod

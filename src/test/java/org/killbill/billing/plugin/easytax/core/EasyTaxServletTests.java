@@ -104,6 +104,7 @@ public class EasyTaxServletTests {
         res = mock(HttpServletResponse.class);
     }
 
+    @SuppressWarnings("unchecked")
     private void givenPermissions(String username, String password, Set<Permission> permissions) {
         String credentials = username + ":" + password;
         try {
