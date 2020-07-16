@@ -315,8 +315,28 @@ the `simpleTaxDateResolver.defaultTimeZone` below).
  * `simpleTaxDateResolver.fallBackToInvoiceCreatedDate`: boolean flag to allow falling
    back to using the invoice creation date if the date mode rules don't resolve a date
 
-Releasing
----------
+# Development
+
+This section details some information useful when developing this plugin.
+
+## Generating jOOQ DAO classes
+
+To generate the jOOQ classes in the `org.killbill.billing.plugin.easytax.dao.gen` package hierarchy,
+you must have a `killbill` MySQL database available with the `src/main/resources/ddl.sql` DDL loaded.
+A `killbill` user with password `killbill` must also be available. Then, run the following command:
+
+```sh
+./src/main/resources/gen.sh
+```
+
+**Note** that Java 8 must be used. You can set a `JAVA_HOME` environment variable if Java 8 is
+not the default runtime available, e.g.
+
+```sh
+JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.8.0_241.jdk/Contents/Home src/main/resources/gen.sh
+```
+
+## Releasing
 
 A command like the following is used to release the plugin:
 
