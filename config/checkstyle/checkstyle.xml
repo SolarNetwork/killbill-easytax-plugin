@@ -171,12 +171,12 @@ Checkstyle configuration that checks the Google coding conventions from Google J
       <property name="exceptionVariableName" value="expected"/>
     </module>
     <module name="CommentsIndentation"/>
-    <module name="CustomImportOrder">
-	  <property name="customImportOrderRules" value="STATIC###STANDARD_JAVA_PACKAGE###SPECIAL_IMPORTS###THIRD_PARTY_PACKAGE"/>
-	  <property name="specialImportsRegExp" value="^org\."/>
-	  <property name="thirdPartyPackageRegExp" value="^com\."/>
-	  <property name="sortImportsInGroupAlphabetically" value="true"/>
-	  <property name="separateLineBetweenGroups" value="true"/>
+    <module name="ImportOrder">
+	  <property name="groups" value="/^java\./,javax,org,com"/>
+	  <property name="ordered" value="true"/>
+	  <property name="separated" value="true"/>
+	  <property name="option" value="top"/>
+	  <property name="sortStaticImportsAlphabetically" value="true"/>
 	</module>
     <module name="SuppressWithNearbyCommentFilter">
       <property name="commentFormat" value="CHECKSTYLE IGNORE (\w+) FOR NEXT (\d+) LINE"/>
