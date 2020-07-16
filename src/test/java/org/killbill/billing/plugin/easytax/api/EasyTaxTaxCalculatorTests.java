@@ -116,7 +116,7 @@ public class EasyTaxTaxCalculatorTests {
     private org.killbill.billing.osgi.libs.killbill.OSGIKillbillLogService osgiKillbillLogService;
     private EasyTaxConfig config = new EasyTaxConfig(new Properties());
 
-    @BeforeMethod
+    @BeforeMethod(alwaysRun = true)
     public void setup() throws Exception {
         clock = Mockito.mock(Clock.class);
         now = new DateTime(DateTimeZone.UTC);

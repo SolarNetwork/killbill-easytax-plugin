@@ -49,7 +49,7 @@ public class AccountCustomFieldTaxZoneResolverTests {
     private OSGIKillbill killbillApi;
     private UUID tenantId;
 
-    @BeforeMethod
+    @BeforeMethod(alwaysRun = true)
     public void setup() {
         tenantId = UUID.randomUUID();
         killbillApi = Mockito.mock(OSGIKillbill.class);

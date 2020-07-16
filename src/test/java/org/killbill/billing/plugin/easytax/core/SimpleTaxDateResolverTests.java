@@ -57,7 +57,7 @@ public class SimpleTaxDateResolverTests {
     private Account account;
     private Invoice invoice;
 
-    @BeforeMethod
+    @BeforeMethod(alwaysRun = true)
     public void setup() {
         now = new DateTime();
         tenantId = UUID.randomUUID();

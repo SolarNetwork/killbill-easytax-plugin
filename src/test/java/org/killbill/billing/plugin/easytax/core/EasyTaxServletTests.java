@@ -91,7 +91,7 @@ public class EasyTaxServletTests {
     private UUID tenantId;
     private Tenant tenant;
 
-    @BeforeMethod
+    @BeforeMethod(alwaysRun = true)
     public void setup() {
         now = new DateTime(DateTimeZone.UTC);
         tenantId = UUID.randomUUID();
