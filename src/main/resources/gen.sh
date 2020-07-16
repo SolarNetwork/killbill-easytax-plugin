@@ -16,7 +16,7 @@
 
 DB=mysql
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-JOOQ_VERSION=3.5.0
+JOOQ_VERSION=3.9.1
 M2_REPOS=~/.m2/repository
 MYSQL_JDBC_VERSION=5.1.35
 PG_JDBC_VERSION=42.1.4

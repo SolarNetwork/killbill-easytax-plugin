@@ -19,8 +19,8 @@
     <jdbc>
         <driver>com.mysql.jdbc.Driver</driver>
         <url>jdbc:mysql://127.0.0.1:3306/killbill</url>
-        <user>root</user>
-        <password>root</password>
+        <user>killbill</user>
+        <password>killbill</password>
 
         <!-- You can also pass user/password and other JDBC properties in the optional properties tag:
         <properties>
