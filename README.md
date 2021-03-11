@@ -1,6 +1,9 @@
 EasyTax plugin
 ==============
 
+> :bangbang: **Note** we are no longer using Kill Bill at SolarNetwork, so will no longer be
+> maintaining this project.
+
 Kill Bill tax plugin for simple region based tax systems. It works by allowing tax rates to be
 defined at the following granularity:
 
